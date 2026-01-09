@@ -857,7 +857,17 @@ if (isset($_GET['logout'])) {
             if (!a) return '-';
             if (a.file) { let fn = a.file.filename || a.file.name || (typeof a.file === 'string' ? a.file : null); if (fn) { let url = '../api/photo.php?file=' + encodeURIComponent(fn); if (folder) url += '&study=' + encodeURIComponent(folder); return '<a href="' + url + '" target="_blank" class="text-sidebar-active hover:underline">Voir photo</a>'; } }
             if (a.value !== undefined) return esc(String(a.value).replace(/_/g, ' '));
-            if (a.values) { if (Array.isArray(a.values)) return esc(a.values.join(', ').replace(/_/g, ' ')); return Object.entries(a.values).map(([k,v]) => k + ': ' + v).join(' | '); }
+            if (a.values) { 
+                if (Array.isArray(a.values)) return esc(a.values.join(', ').replace(/_/g, ' ')); 
+                // Format objet : "Marque : Babyliss, Modèle : Ndp"
+                return Object.entries(a.values).map(([k,v]) => {
+                    // Capitaliser la clé et remplacer les underscores
+                    const key = k.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+                    // Remplacer les underscores dans la valeur aussi
+                    const val = String(v).replace(/_/g, ' ');
+                    return key + ' : ' + val;
+                }).join(', '); 
+            }
             return esc(JSON.stringify(a));
         }
 
