@@ -545,7 +545,10 @@ if (isset($_GET['logout'])) {
 
             <div class="bg-white rounded-xl border border-gray-100 overflow-hidden mb-6">
                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <p class="font-medium text-gray-700">Participants qualifiés</p>
+                    <div class="flex items-center gap-2">
+                        <p class="font-medium text-gray-700">Participants qualifiés</p>
+                        <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">${qualifies.length}</span>
+                    </div>
                     <button onclick="exportStudy('${study.studyId}', 'qualifies')" class="px-3 py-1.5 text-sm bg-sidebar-active text-white rounded-lg hover:bg-blue-600 transition">Exporter</button>
                 </div>
                 <div class="overflow-x-auto">
@@ -560,25 +563,11 @@ if (isset($_GET['logout'])) {
                             <th class="px-4 py-3 text-left">Horaire</th>
                             <th class="px-4 py-3 text-left">Actions</th>
                         </tr></thead>
-                        <tbody class="divide-y divide-gray-50">
-                            ${qualifies.length === 0 ? '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Aucun</td></tr>' : 
-                            qualifies.map((p, i) => `
-                            <tr data-index="${i}" class="hover:bg-gray-50">
-                                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">${esc(p.accessId || '-')}</span></td>
-                                <td class="px-4 py-3 font-medium text-gray-800">${esc(p.nom)}</td>
-                                <td class="px-4 py-3 text-gray-600">${esc(p.prenom)}</td>
-                                <td class="px-4 py-3 text-sm text-gray-500">${esc(p.email)}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">${esc(p.telephone)}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">${esc(p.ville)}</td>
-                                <td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(p.horaire)}</td>
-                                <td class="px-4 py-3"><div class="flex gap-1">
-                                    <button onclick="showResponses('${study.studyId}', ${i}, 'qualifies')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>
-                                    <button onclick="deleteParticipant('${study.studyId}', '${p.id}', '${esc(p.prenom)} ${esc(p.nom)}')" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>
-                                </div></td>
-                            </tr>`).join('')}
+                        <tbody id="qualifies-tbody-${study.studyId}" class="divide-y divide-gray-50">
                         </tbody>
                     </table>
                 </div>
+                <div id="qualifies-pagination-${study.studyId}" class="px-4 py-3 border-t border-gray-100 flex items-center justify-between"></div>
             </div>
 
             <div class="bg-white rounded-xl border border-amber-200 overflow-hidden mb-6">
@@ -601,34 +590,23 @@ if (isset($_GET['logout'])) {
                             <th class="px-4 py-3 text-left">Début</th>
                             <th class="px-4 py-3 text-left">Actions</th>
                         </tr></thead>
-                        <tbody class="divide-y divide-gray-50">
-                            ${(study.enCours || []).length === 0 ? '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Aucun participant en cours</td></tr>' : 
-                            (study.enCours || []).map((p, i) => `
-                            <tr class="hover:bg-amber-50">
-                                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-amber-100 rounded text-xs font-mono">${esc(p.accessId || '-')}</span></td>
-                                <td class="px-4 py-3 font-medium text-gray-800">${esc(p.nom)}</td>
-                                <td class="px-4 py-3 text-gray-600">${esc(p.prenom)}</td>
-                                <td class="px-4 py-3 text-sm text-gray-500">${esc(p.email)}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">${esc(p.telephone)}</td>
-                                <td class="px-4 py-3"><span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded">${p.questionsRepondues || 0} répondue(s)</span></td>
-                                <td class="px-4 py-3 text-sm text-gray-500">${formatDate(p.dateDebut)}</td>
-                                <td class="px-4 py-3"><div class="flex gap-1">
-                                    <button onclick="showResponses('${study.studyId}', ${i}, 'enCours')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>
-                                    <button onclick="deleteParticipant('${study.studyId}', '${p.id}', '${esc(p.prenom)} ${esc(p.nom)}')" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>
-                                </div></td>
-                            </tr>`).join('')}
+                        <tbody id="encours-tbody-${study.studyId}" class="divide-y divide-gray-50">
                         </tbody>
                     </table>
                 </div>
+                <div id="encours-pagination-${study.studyId}" class="px-4 py-3 border-t border-amber-200 flex items-center justify-between"></div>
             </div>
 
-            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden mb-6">
                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <p class="font-medium text-gray-700">Participants refusés</p>
+                    <div class="flex items-center gap-2">
+                        <p class="font-medium text-gray-700">Participants refusés</p>
+                        <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">${refuses.length}</span>
+                    </div>
                     <button onclick="exportStudy('${study.studyId}', 'refuses')" class="px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition">Exporter</button>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full">
+                    <table class="w-full" id="refuses-table-${study.studyId}">
                         <thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr>
                             <th class="px-4 py-3 text-left">ID</th>
                             <th class="px-4 py-3 text-left">Nom</th>
@@ -637,25 +615,18 @@ if (isset($_GET['logout'])) {
                             <th class="px-4 py-3 text-left">Raison</th>
                             <th class="px-4 py-3 text-left">Actions</th>
                         </tr></thead>
-                        <tbody class="divide-y divide-gray-50">
-                            ${refuses.length === 0 ? '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">Aucun</td></tr>' : 
-                            refuses.map((p, i) => `
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">${esc(p.accessId || '-')}</span></td>
-                                <td class="px-4 py-3 font-medium text-gray-800">${esc(p.nom)}</td>
-                                <td class="px-4 py-3 text-gray-600">${esc(p.prenom)}</td>
-                                <td class="px-4 py-3 text-sm text-gray-500">${esc(p.email)}</td>
-                                <td class="px-4 py-3 text-sm text-red-500">${(p.raisons || []).join(', ')}</td>
-                                <td class="px-4 py-3"><div class="flex gap-1">
-                                    <button onclick="showResponses('${study.studyId}', ${i}, 'refuses')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>
-                                    <button onclick="acceptParticipant('${study.studyId}', '${p.id}', '${esc(p.prenom)} ${esc(p.nom)}')" class="px-2 py-1 text-xs text-green-600 bg-green-50 hover:bg-green-100 rounded transition">Accepter</button>
-                                </div></td>
-                            </tr>`).join('')}
+                        <tbody id="refuses-tbody-${study.studyId}" class="divide-y divide-gray-50">
                         </tbody>
                     </table>
                 </div>
+                <div id="refuses-pagination-${study.studyId}" class="px-4 py-3 border-t border-gray-100 flex items-center justify-between"></div>
             </div>`;
             document.getElementById('main-content').innerHTML = html;
+            
+            // Initialiser la pagination pour chaque tableau
+            initPagination(study.studyId, 'qualifies', qualifies);
+            initPagination(study.studyId, 'encours', study.enCours || []);
+            initPagination(study.studyId, 'refuses', refuses);
         }
 
         function esc(t) { if (t === null || t === undefined) return '-'; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
@@ -668,6 +639,144 @@ if (isset($_GET['logout'])) {
             } catch (e) {
                 return dateStr;
             }
+        }
+
+        // ===== SYSTÈME DE PAGINATION =====
+        const ITEMS_PER_PAGE = 10;
+        let paginationData = {};
+
+        function initPagination(studyId, type, data) {
+            const key = `${studyId}_${type}`;
+            paginationData[key] = {
+                data: data,
+                currentPage: 1,
+                totalPages: Math.ceil(data.length / ITEMS_PER_PAGE) || 1
+            };
+            renderPaginatedTable(studyId, type);
+        }
+
+        function renderPaginatedTable(studyId, type) {
+            const key = `${studyId}_${type}`;
+            const pd = paginationData[key];
+            if (!pd) return;
+
+            const start = (pd.currentPage - 1) * ITEMS_PER_PAGE;
+            const end = start + ITEMS_PER_PAGE;
+            const pageData = pd.data.slice(start, end);
+
+            const tbody = document.getElementById(type + '-tbody-' + studyId);
+            const paginationDiv = document.getElementById(type + '-pagination-' + studyId);
+            
+            if (!tbody) {
+                console.error('tbody non trouvé:', type + '-tbody-' + studyId);
+                return;
+            }
+
+            // Générer les lignes du tableau selon le type
+            if (pageData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Aucun</td></tr>';
+            } else {
+                let rows = '';
+                pageData.forEach((p, i) => {
+                    const realIndex = start + i;
+                    const nom = esc(p.nom || '');
+                    const prenom = esc(p.prenom || '');
+                    const email = esc(p.email || '');
+                    const telephone = esc(p.telephone || '');
+                    const accessId = esc(p.accessId || '-');
+                    const ville = esc(p.ville || '');
+                    const horaire = esc(p.horaire || '');
+                    const pid = p.id || '';
+                    const fullName = (prenom + ' ' + nom).replace(/'/g, "\\'");
+                    
+                    if (type === 'qualifies') {
+                        rows += '<tr data-index="' + realIndex + '" class="hover:bg-gray-50">' +
+                            '<td class="px-4 py-3"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">' + accessId + '</span></td>' +
+                            '<td class="px-4 py-3 font-medium text-gray-800">' + nom + '</td>' +
+                            '<td class="px-4 py-3 text-gray-600">' + prenom + '</td>' +
+                            '<td class="px-4 py-3 text-sm text-gray-500">' + email + '</td>' +
+                            '<td class="px-4 py-3 text-sm text-gray-600">' + telephone + '</td>' +
+                            '<td class="px-4 py-3 text-sm text-gray-600">' + ville + '</td>' +
+                            '<td class="px-4 py-3 text-sm font-medium text-gray-800">' + horaire + '</td>' +
+                            '<td class="px-4 py-3"><div class="flex gap-1">' +
+                                '<button onclick="showResponses(\'' + studyId + '\', ' + realIndex + ', \'qualifies\')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>' +
+                                '<button onclick="deleteParticipant(\'' + studyId + '\', \'' + pid + '\', \'' + fullName + '\')" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>' +
+                            '</div></td>' +
+                        '</tr>';
+                    } else if (type === 'encours') {
+                        const questions = p.questionsRepondues || 0;
+                        const dateDebut = formatDate(p.dateDebut);
+                        rows += '<tr class="hover:bg-amber-50">' +
+                            '<td class="px-4 py-3"><span class="px-2 py-0.5 bg-amber-100 rounded text-xs font-mono">' + accessId + '</span></td>' +
+                            '<td class="px-4 py-3 font-medium text-gray-800">' + nom + '</td>' +
+                            '<td class="px-4 py-3 text-gray-600">' + prenom + '</td>' +
+                            '<td class="px-4 py-3 text-sm text-gray-500">' + email + '</td>' +
+                            '<td class="px-4 py-3 text-sm text-gray-600">' + telephone + '</td>' +
+                            '<td class="px-4 py-3"><span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded">' + questions + ' répondue(s)</span></td>' +
+                            '<td class="px-4 py-3 text-sm text-gray-500">' + dateDebut + '</td>' +
+                            '<td class="px-4 py-3"><div class="flex gap-1">' +
+                                '<button onclick="showResponses(\'' + studyId + '\', ' + realIndex + ', \'enCours\')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>' +
+                                '<button onclick="deleteParticipant(\'' + studyId + '\', \'' + pid + '\', \'' + fullName + '\')" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>' +
+                            '</div></td>' +
+                        '</tr>';
+                    } else if (type === 'refuses') {
+                        const raisons = (p.raisons || []).join(', ');
+                        rows += '<tr class="hover:bg-gray-50">' +
+                            '<td class="px-4 py-3"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">' + accessId + '</span></td>' +
+                            '<td class="px-4 py-3 font-medium text-gray-800">' + nom + '</td>' +
+                            '<td class="px-4 py-3 text-gray-600">' + prenom + '</td>' +
+                            '<td class="px-4 py-3 text-sm text-gray-500">' + email + '</td>' +
+                            '<td class="px-4 py-3 text-sm text-red-500">' + raisons + '</td>' +
+                            '<td class="px-4 py-3"><div class="flex gap-1">' +
+                                '<button onclick="showResponses(\'' + studyId + '\', ' + realIndex + ', \'refuses\')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>' +
+                                '<button onclick="acceptParticipant(\'' + studyId + '\', \'' + pid + '\', \'' + fullName + '\')" class="px-2 py-1 text-xs text-green-600 bg-green-50 hover:bg-green-100 rounded transition">Accepter</button>' +
+                            '</div></td>' +
+                        '</tr>';
+                    }
+                });
+                tbody.innerHTML = rows;
+            }
+
+            // Générer la pagination
+            if (paginationDiv) {
+                if (pd.data.length <= ITEMS_PER_PAGE) {
+                    paginationDiv.innerHTML = `<span class="text-sm text-gray-500">${pd.data.length} élément(s)</span>`;
+                } else {
+                    const startNum = start + 1;
+                    const endNum = Math.min(end, pd.data.length);
+                    
+                    let pagesHtml = '';
+                    for (let i = 1; i <= pd.totalPages; i++) {
+                        if (i === pd.currentPage) {
+                            pagesHtml += `<button class="px-3 py-1 text-sm bg-sidebar-active text-white rounded">${i}</button>`;
+                        } else {
+                            pagesHtml += `<button onclick="goToPage('${studyId}', '${type}', ${i})" class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition">${i}</button>`;
+                        }
+                    }
+
+                    paginationDiv.innerHTML = `
+                        <span class="text-sm text-gray-500">${startNum}-${endNum} sur ${pd.data.length}</span>
+                        <div class="flex items-center gap-1">
+                            <button onclick="goToPage('${studyId}', '${type}', ${pd.currentPage - 1})" ${pd.currentPage === 1 ? 'disabled' : ''} class="px-2 py-1 text-sm ${pd.currentPage === 1 ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'} rounded transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            ${pagesHtml}
+                            <button onclick="goToPage('${studyId}', '${type}', ${pd.currentPage + 1})" ${pd.currentPage === pd.totalPages ? 'disabled' : ''} class="px-2 py-1 text-sm ${pd.currentPage === pd.totalPages ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'} rounded transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function goToPage(studyId, type, page) {
+            const key = `${studyId}_${type}`;
+            const pd = paginationData[key];
+            if (!pd) return;
+            if (page < 1 || page > pd.totalPages) return;
+            pd.currentPage = page;
+            renderPaginatedTable(studyId, type);
         }
 
         let studyQuestionTitles = {};
@@ -1021,6 +1130,24 @@ if (isset($_GET['logout'])) {
             const study = allData.studies.find(s => s.studyId === studyId); if (!study) return;
             const data = type === 'qualifies' ? study.qualifies : study.refuses;
             if (!data || data.length === 0) { alert('Aucune donnée'); return; }
+            
+            // Fonction pour formater les dates
+            function formatExportDate(dateStr) {
+                if (!dateStr || dateStr === 'N/A') return '';
+                try {
+                    const d = new Date(dateStr);
+                    if (isNaN(d.getTime())) return dateStr;
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+                    return `${day}/${month}/${year} ${hours}:${minutes}`;
+                } catch (e) {
+                    return dateStr;
+                }
+            }
+            
             fetch('../studies/' + study.folder + '/questions.js?v=' + Date.now()).then(r => r.text()).then(js => {
                 // Parser les titres des questions avec une meilleure regex
                 const titles = {};
@@ -1048,7 +1175,7 @@ if (isset($_GET['logout'])) {
                 qIds.forEach(qId => headers.push(titles[qId] || qId));
                 
                 const rows = data.map(p => { 
-                    let row = [p.accessId||'', p.nom||'', p.prenom||'', p.email||'', p.telephone||'', p.adresse||'', p.codePostal||'', p.ville||'', p.horaire||'', p.date||'']; 
+                    let row = [p.accessId||'', p.nom||'', p.prenom||'', p.email||'', p.telephone||'', p.adresse||'', p.codePostal||'', p.ville||'', p.horaire||'', formatExportDate(p.date)]; 
                     if (type === 'refuses') row.push((p.raisons||[]).join(' | ')); 
                     qIds.forEach(qId => { 
                         const a = p.reponses?.[qId]; 
