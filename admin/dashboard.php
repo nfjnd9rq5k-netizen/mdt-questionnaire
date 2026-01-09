@@ -135,6 +135,48 @@ if (isset($_GET['logout'])) {
         </div>
     </div>
 
+    <!-- Modal de prévisualisation -->
+    <div id="preview-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="px-6 py-4 bg-purple-600 text-white flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    <div>
+                        <h3 id="preview-title" class="font-semibold">Prévisualisation</h3>
+                        <p id="preview-subtitle" class="text-sm text-purple-200"></p>
+                    </div>
+                </div>
+                <button onclick="closePreview()" class="p-2 hover:bg-purple-500 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="px-6 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">Question</span>
+                    <span id="preview-counter" class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-medium text-sm">1 / 10</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="preview-jump" onchange="jumpToQuestion()" class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg">
+                    </select>
+                </div>
+            </div>
+            <div id="preview-body" class="p-6 overflow-y-auto flex-1 bg-white">
+                <!-- Contenu de la question -->
+            </div>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                <button onclick="prevQuestion()" id="preview-prev" class="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    Précédent
+                </button>
+                <div class="flex items-center gap-1" id="preview-dots"></div>
+                <button onclick="nextQuestion()" id="preview-next" class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2">
+                    Suivant
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let allData = null;
         let currentTab = 'dashboard';
@@ -413,6 +455,10 @@ if (isset($_GET['logout'])) {
                         </a>
                     </div>
                     <div class="flex items-center gap-2">
+                        <button onclick="previewStudy('${study.folder}')" class="px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            Prévisualiser
+                        </button>
                         <button onclick="copyStudyLink('${study.folder}')" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                             Copier le lien
@@ -600,7 +646,10 @@ if (isset($_GET['logout'])) {
                                 <td class="px-4 py-3 text-gray-600">${esc(p.prenom)}</td>
                                 <td class="px-4 py-3 text-sm text-gray-500">${esc(p.email)}</td>
                                 <td class="px-4 py-3 text-sm text-red-500">${(p.raisons || []).join(', ')}</td>
-                                <td class="px-4 py-3"><button onclick="showResponses('${study.studyId}', ${i}, 'refuses')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button></td>
+                                <td class="px-4 py-3"><div class="flex gap-1">
+                                    <button onclick="showResponses('${study.studyId}', ${i}, 'refuses')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>
+                                    <button onclick="acceptParticipant('${study.studyId}', '${p.id}', '${esc(p.prenom)} ${esc(p.nom)}')" class="px-2 py-1 text-xs text-green-600 bg-green-50 hover:bg-green-100 rounded transition">Accepter</button>
+                                </div></td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
@@ -926,6 +975,27 @@ if (isset($_GET['logout'])) {
             try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_participant', studyId, participantId }) }); const data = await res.json(); if (data.success) loadData(); } catch (e) { console.error(e); }
         }
 
+        async function acceptParticipant(studyId, participantId, name) {
+            if (!confirm('Accepter ' + name + ' et le passer en qualifié ?')) return;
+            try { 
+                const res = await fetch('../api/admin-data.php', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ action: 'accept_participant', studyId, participantId }) 
+                }); 
+                const data = await res.json(); 
+                if (data.success) {
+                    loadData();
+                    alert(name + ' a été accepté et déplacé vers les qualifiés.');
+                } else {
+                    alert('Erreur : ' + (data.error || 'Impossible d\'accepter ce participant'));
+                }
+            } catch (e) { 
+                console.error(e); 
+                alert('Erreur de connexion');
+            }
+        }
+
         async function closeStudy(folder) {
             if (!confirm('Terminer cette étude ?')) return;
             try { const res = await fetch('../api/study-status.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'close', studyFolder: folder }) }); const data = await res.json(); if (data.success) loadData(); } catch (e) { console.error(e); }
@@ -951,13 +1021,61 @@ if (isset($_GET['logout'])) {
             const study = allData.studies.find(s => s.studyId === studyId); if (!study) return;
             const data = type === 'qualifies' ? study.qualifies : study.refuses;
             if (!data || data.length === 0) { alert('Aucune donnée'); return; }
-            fetch('../studies/' + study.folder + '/questions.js').then(r => r.text()).then(js => {
-                const titles = {}; js.split(/\{\s*id:/).forEach(b => { const idM = b.match(/^\s*['"]([^'"]+)['"]/); if (!idM) return; const tM = b.match(/title:\s*['"]([^'"]+)['"]/) || b.match(/question:\s*['"]([^'"]+)['"]/); if (tM) titles[idM[1]] = tM[1].replace(/<[^>]*>/g, '').substring(0, 50); });
-                const allQIds = new Set(); data.forEach(p => { if (p.reponses) Object.keys(p.reponses).forEach(q => allQIds.add(q)); });
-                const qIds = Array.from(allQIds).sort((a, b) => { const na = parseInt(a.replace(/\D/g, '')) || 0, nb = parseInt(b.replace(/\D/g, '')) || 0; return na !== nb ? na - nb : a.localeCompare(b); });
-                let headers = ['ID', 'Nom', 'Prénom', 'Email', 'Téléphone', 'Adresse', 'CP', 'Ville', 'Horaire', 'Date']; if (type === 'refuses') headers.push('Raisons'); qIds.forEach(qId => headers.push(titles[qId] || qId));
-                const rows = data.map(p => { let row = [p.accessId||'', p.nom||'', p.prenom||'', p.email||'', p.telephone||'', p.adresse||'', p.codePostal||'', p.ville||'', p.horaire||'', p.date||'']; if (type === 'refuses') row.push((p.raisons||[]).join(' | ')); qIds.forEach(qId => { const a = p.reponses?.[qId]; if (!a) { row.push(''); return; } if (a.file) { row.push(a.file.filename || 'Photo'); return; } if (a.value !== undefined) { row.push(String(a.value).replace(/_/g, ' ')); return; } if (a.values) { if (Array.isArray(a.values)) { row.push(a.values.join(', ').replace(/_/g, ' ')); return; } row.push(Object.entries(a.values).map(([k,v]) => k + ': ' + v).join(' | ')); return; } row.push(JSON.stringify(a)); }); return row; });
-                const form = document.createElement('form'); form.method = 'POST'; form.action = '../api/export-xlsx.php'; form.innerHTML = '<input type="hidden" name="data" value=\'' + JSON.stringify({headers, rows}).replace(/'/g, '&#39;') + '\'><input type="hidden" name="filename" value="' + studyId + '_' + type + '"><input type="hidden" name="studyId" value="' + studyId + '">'; document.body.appendChild(form); form.submit(); document.body.removeChild(form);
+            fetch('../studies/' + study.folder + '/questions.js?v=' + Date.now()).then(r => r.text()).then(js => {
+                // Parser les titres des questions avec une meilleure regex
+                const titles = {};
+                const regex = /id:\s*['"]([^'"]+)['"][^}]*?(?:title|question):\s*['"]([^'"]+)['"]/gs;
+                let match;
+                while ((match = regex.exec(js)) !== null) {
+                    const id = match[1];
+                    const title = match[2].replace(/<[^>]*>/g, '').replace(/_/g, ' ').trim();
+                    if (title && !titles[id]) {
+                        titles[id] = title.substring(0, 60);
+                    }
+                }
+                console.log('Titres pour export:', titles);
+                
+                const allQIds = new Set(); 
+                data.forEach(p => { if (p.reponses) Object.keys(p.reponses).forEach(q => allQIds.add(q)); });
+                const qIds = Array.from(allQIds).sort((a, b) => { 
+                    const na = parseInt(a.replace(/\D/g, '')) || 0;
+                    const nb = parseInt(b.replace(/\D/g, '')) || 0; 
+                    return na !== nb ? na - nb : a.localeCompare(b); 
+                });
+                
+                let headers = ['ID', 'Nom', 'Prénom', 'Email', 'Téléphone', 'Adresse', 'CP', 'Ville', 'Horaire', 'Date']; 
+                if (type === 'refuses') headers.push('Raisons'); 
+                qIds.forEach(qId => headers.push(titles[qId] || qId));
+                
+                const rows = data.map(p => { 
+                    let row = [p.accessId||'', p.nom||'', p.prenom||'', p.email||'', p.telephone||'', p.adresse||'', p.codePostal||'', p.ville||'', p.horaire||'', p.date||'']; 
+                    if (type === 'refuses') row.push((p.raisons||[]).join(' | ')); 
+                    qIds.forEach(qId => { 
+                        const a = p.reponses?.[qId]; 
+                        if (!a) { row.push(''); return; } 
+                        if (a.file) { row.push(a.file.filename || 'Photo'); return; } 
+                        if (a.value !== undefined) { row.push(String(a.value).replace(/_/g, ' ')); return; } 
+                        if (a.values) { 
+                            if (Array.isArray(a.values)) { row.push(a.values.join(', ').replace(/_/g, ' ')); return; } 
+                            row.push(Object.entries(a.values).map(([k,v]) => {
+                                const key = k.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+                                const val = String(v).replace(/_/g, ' ');
+                                return key + ' : ' + val;
+                            }).join(', ')); 
+                            return; 
+                        } 
+                        row.push(JSON.stringify(a)); 
+                    }); 
+                    return row; 
+                });
+                
+                const form = document.createElement('form'); 
+                form.method = 'POST'; 
+                form.action = '../api/export-xlsx.php'; 
+                form.innerHTML = '<input type="hidden" name="data" value=\'' + JSON.stringify({headers, rows}).replace(/'/g, '&#39;') + '\'><input type="hidden" name="filename" value="' + studyId + '_' + type + '"><input type="hidden" name="studyId" value="' + studyId + '">'; 
+                document.body.appendChild(form); 
+                form.submit(); 
+                document.body.removeChild(form);
             });
         }
 
@@ -1068,6 +1186,171 @@ if (isset($_GET['logout'])) {
             }
         }
 
+        // ===== PRÉVISUALISATION DU QUESTIONNAIRE =====
+        let previewQuestions = [];
+        let previewCurrentIndex = 0;
+        let previewStudyFolder = null;
+
+        async function previewStudy(folder) {
+            previewStudyFolder = folder;
+            previewCurrentIndex = 0;
+            
+            try {
+                const response = await fetch('../studies/' + folder + '/questions.js?v=' + Date.now());
+                const jsContent = await response.text();
+                
+                // Extraire STUDY_CONFIG
+                const configMatch = jsContent.match(/const\s+STUDY_CONFIG\s*=\s*(\{[\s\S]*\});?\s*$/m);
+                if (!configMatch) {
+                    alert('Impossible de charger la configuration de l\'étude');
+                    return;
+                }
+                
+                // Parser le contenu JS de manière sécurisée
+                try {
+                    const evalFunc = new Function('return ' + configMatch[1]);
+                    const config = evalFunc();
+                    previewQuestions = config.questions || [];
+                    
+                    document.getElementById('preview-title').textContent = config.studyTitle || 'Questionnaire';
+                    document.getElementById('preview-subtitle').textContent = previewQuestions.length + ' questions';
+                    
+                    // Remplir le sélecteur de questions
+                    const select = document.getElementById('preview-jump');
+                    select.innerHTML = previewQuestions.map((q, i) => 
+                        `<option value="${i}">${q.id} - ${(q.title || q.question || '').substring(0, 30)}...</option>`
+                    ).join('');
+                    
+                    renderPreviewQuestion();
+                    openPreview();
+                } catch (e) {
+                    console.error('Erreur parsing config:', e);
+                    alert('Erreur lors du parsing de la configuration');
+                }
+            } catch (e) {
+                console.error('Erreur chargement questions:', e);
+                alert('Erreur lors du chargement du questionnaire');
+            }
+        }
+
+        function openPreview() {
+            document.getElementById('preview-modal').classList.remove('hidden');
+            document.getElementById('preview-modal').classList.add('flex');
+        }
+
+        function closePreview() {
+            document.getElementById('preview-modal').classList.add('hidden');
+            document.getElementById('preview-modal').classList.remove('flex');
+        }
+
+        function renderPreviewQuestion() {
+            if (previewQuestions.length === 0) return;
+            
+            const q = previewQuestions[previewCurrentIndex];
+            const total = previewQuestions.length;
+            
+            // Mettre à jour le compteur
+            document.getElementById('preview-counter').textContent = `${previewCurrentIndex + 1} / ${total}`;
+            document.getElementById('preview-jump').value = previewCurrentIndex;
+            
+            // Boutons prev/next
+            document.getElementById('preview-prev').disabled = previewCurrentIndex === 0;
+            document.getElementById('preview-prev').classList.toggle('opacity-50', previewCurrentIndex === 0);
+            document.getElementById('preview-next').disabled = previewCurrentIndex === total - 1;
+            document.getElementById('preview-next').classList.toggle('opacity-50', previewCurrentIndex === total - 1);
+            
+            // Dots de navigation
+            const dotsHtml = previewQuestions.map((_, i) => 
+                `<button onclick="goToQuestion(${i})" class="w-2 h-2 rounded-full transition ${i === previewCurrentIndex ? 'bg-purple-600 w-4' : 'bg-gray-300 hover:bg-gray-400'}"></button>`
+            ).join('');
+            document.getElementById('preview-dots').innerHTML = dotsHtml;
+            
+            // Contenu de la question
+            let html = `
+                <div class="mb-4">
+                    <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">${esc(q.id)}</span>
+                    <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded ml-2">${esc(q.type || 'single')}</span>
+                    ${q.showIf ? `<span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded ml-2">Conditionnel</span>` : ''}
+                </div>
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">${esc(q.title || '')}</h4>
+                <p class="text-gray-600 mb-6">${q.question || ''}</p>
+            `;
+            
+            // Afficher les options selon le type
+            if (q.type === 'single' || q.type === 'multiple' || !q.type) {
+                if (q.options && q.options.length > 0) {
+                    html += `<div class="space-y-2">`;
+                    q.options.forEach(opt => {
+                        const isStop = opt.stop === true;
+                        html += `
+                            <div class="flex items-center gap-3 p-3 border ${isStop ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'} rounded-lg">
+                                <div class="w-5 h-5 border-2 ${q.type === 'multiple' ? 'rounded' : 'rounded-full'} ${isStop ? 'border-red-400' : 'border-gray-300'}"></div>
+                                <span class="flex-1 ${isStop ? 'text-red-700' : 'text-gray-700'}">${esc(opt.label || opt.value)}</span>
+                                ${isStop ? '<span class="text-xs text-red-500 font-medium">STOP</span>' : ''}
+                                ${opt.exclusive ? '<span class="text-xs text-blue-500 font-medium">EXCLUSIF</span>' : ''}
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                }
+            } else if (q.type === 'text') {
+                html += `<div class="p-3 border border-gray-200 bg-gray-50 rounded-lg text-gray-400 italic">${q.placeholder || 'Champ texte...'}</div>`;
+            } else if (q.type === 'number') {
+                html += `<div class="p-3 border border-gray-200 bg-gray-50 rounded-lg text-gray-400 italic">Champ numérique ${q.min !== undefined ? '(min: ' + q.min + ')' : ''} ${q.max !== undefined ? '(max: ' + q.max + ')' : ''}</div>`;
+            } else if (q.type === 'photo') {
+                html += `<div class="p-6 border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg text-center text-gray-400">
+                    <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Upload photo
+                </div>`;
+            } else if (q.type === 'scale') {
+                html += `<div class="flex items-center justify-between gap-2 mt-4">`;
+                const min = q.min || 1, max = q.max || 10;
+                for (let i = min; i <= max; i++) {
+                    html += `<button class="w-10 h-10 border border-gray-300 rounded-lg text-gray-600 hover:bg-purple-100">${i}</button>`;
+                }
+                html += `</div>`;
+                if (q.minLabel || q.maxLabel) {
+                    html += `<div class="flex justify-between text-xs text-gray-400 mt-2"><span>${q.minLabel || ''}</span><span>${q.maxLabel || ''}</span></div>`;
+                }
+            }
+            
+            // Condition d'affichage
+            if (q.showIf) {
+                html += `<div class="mt-6 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p class="text-xs font-medium text-amber-700 mb-1">Condition d'affichage :</p>
+                    <code class="text-xs text-amber-800 break-all">${esc(q.showIf.toString().substring(0, 200))}</code>
+                </div>`;
+            }
+            
+            document.getElementById('preview-body').innerHTML = html;
+        }
+
+        function nextQuestion() {
+            if (previewCurrentIndex < previewQuestions.length - 1) {
+                previewCurrentIndex++;
+                renderPreviewQuestion();
+            }
+        }
+
+        function prevQuestion() {
+            if (previewCurrentIndex > 0) {
+                previewCurrentIndex--;
+                renderPreviewQuestion();
+            }
+        }
+
+        function goToQuestion(index) {
+            previewCurrentIndex = index;
+            renderPreviewQuestion();
+        }
+
+        function jumpToQuestion() {
+            const select = document.getElementById('preview-jump');
+            previewCurrentIndex = parseInt(select.value) || 0;
+            renderPreviewQuestion();
+        }
+
+        document.getElementById('preview-modal').addEventListener('click', e => { if (e.target.id === 'preview-modal') closePreview(); });
         document.getElementById('responses-modal').addEventListener('click', e => { if (e.target.id === 'responses-modal') closeModal(); });
         switchTab('dashboard');
         loadData();
