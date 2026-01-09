@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Questionnaire de Recrutement</title>
+    <link rel="stylesheet" href="../../css/style.css?v=60">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Chargement du questionnaire...</p>
+        </div>
+    </div>
+    
+    <script src="../../js/engine.js?v=60"></script>
+    <script src="questions.js?v=60"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('status.json?v=60' + Date.now());
+                const status = await response.json();
+                
+                if (status.status === 'closed') {
+                    window.location.href = '../closed.html';
+                    return;
+                }
+                
+                const questionnaire = new QuestionnaireEngine(STUDY_CONFIG);
+                questionnaire.init();
+            } catch (error) {
+                const questionnaire = new QuestionnaireEngine(STUDY_CONFIG);
+                questionnaire.init();
+            }
+        });
+    </script>
+</body>
+</html>
