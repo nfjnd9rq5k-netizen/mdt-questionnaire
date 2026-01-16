@@ -803,11 +803,13 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             const key = `${studyId}_${type}`, pd = paginationData[key];
             if (!pd) return;
             const start = (pd.currentPage - 1) * ITEMS_PER_PAGE, end = start + ITEMS_PER_PAGE, pageData = pd.data.slice(start, end);
-            const tbody = document.getElementById(`${type}-tbody-${studyId}`);
+            // Convertir enCours -> encours pour matcher les IDs HTML
+            const htmlType = type === 'enCours' ? 'encours' : type;
+            const tbody = document.getElementById(`${htmlType}-tbody-${studyId}`);
             if (!tbody) return;
-            
+
             // Détecter le type d'étude
-            const table = document.getElementById(`${type}-table-${studyId}`);
+            const table = document.getElementById(`${htmlType}-table-${studyId}`);
             const isDataCollection = table && table.dataset.studyType === 'data_collection';
 
             if (type === 'qualifies') {
@@ -880,7 +882,7 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
                 }
             }
 
-            const paginationDiv = document.getElementById(`${type}-pagination-${studyId}`);
+            const paginationDiv = document.getElementById(`${htmlType}-pagination-${studyId}`);
             if (paginationDiv) {
                 if (pd.data.length <= ITEMS_PER_PAGE) { paginationDiv.innerHTML = `<span class="text-sm text-gray-500">${pd.data.length} élément(s)</span>`; }
                 else {
