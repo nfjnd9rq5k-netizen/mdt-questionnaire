@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Local config
+.mcp.json
+.playwright-mcp/
+.claude/settings.local.json
+
+# Old projects (to delete manually)
+mobile-app/
+
+# Secure data (already protected by .htaccess)
+# api/secure_data/ is tracked but contains sensitive files
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# PDF documents (optional - remove this line if you want to track them)
+*.pdf
