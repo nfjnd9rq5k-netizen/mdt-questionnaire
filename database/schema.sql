@@ -344,6 +344,59 @@ CREATE TABLE IF NOT EXISTS `push_notifications` (
     FOREIGN KEY (`solicitation_id`) REFERENCES `solicitations`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================
+-- TABLE: panel_imported (Données panélistes importées Excel)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `panel_imported` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `panel_id` INT UNSIGNED NOT NULL COMMENT 'ID original du fichier Excel',
+    `email` VARCHAR(255) NOT NULL,
+    `region` VARCHAR(50) DEFAULT NULL,
+    `civilite` VARCHAR(20) DEFAULT NULL,
+    `nom` VARCHAR(100) DEFAULT NULL,
+    `prenom` VARCHAR(100) DEFAULT NULL,
+    `adresse` TEXT DEFAULT NULL,
+    `code_postal` VARCHAR(10) DEFAULT NULL,
+    `departement` VARCHAR(10) DEFAULT NULL,
+    `ville` VARCHAR(100) DEFAULT NULL,
+    `tel_domicile` VARCHAR(20) DEFAULT NULL,
+    `tel_portable` VARCHAR(20) DEFAULT NULL,
+    `tel_bureau` VARCHAR(20) DEFAULT NULL,
+    `date_naissance` DATE DEFAULT NULL,
+    `age` INT UNSIGNED DEFAULT NULL,
+    `situation_familiale` VARCHAR(100) DEFAULT NULL,
+    `situation_professionnelle` VARCHAR(100) DEFAULT NULL,
+    `enfants_au_foyer` INT UNSIGNED DEFAULT 0,
+    `enfants_plus_18ans` INT UNSIGNED DEFAULT 0,
+    `enfants_moins_18ans` INT UNSIGNED DEFAULT 0,
+    `enfants_data` JSON DEFAULT NULL,
+    `diplome` VARCHAR(100) DEFAULT NULL,
+    `profession` VARCHAR(100) DEFAULT NULL,
+    `secteur_activite` VARCHAR(100) DEFAULT NULL,
+    `revenu_mensuel` VARCHAR(100) DEFAULT NULL,
+    `banque_principale` VARCHAR(100) DEFAULT NULL,
+    `autres_banques` VARCHAR(255) DEFAULT NULL,
+    `conjoint_data` JSON DEFAULT NULL,
+    `type_habitation` VARCHAR(100) DEFAULT NULL,
+    `situation_habitation` VARCHAR(100) DEFAULT NULL,
+    `possede_voiture` TINYINT(1) DEFAULT NULL,
+    `voitures_data` JSON DEFAULT NULL,
+    `possede_moto` TINYINT(1) DEFAULT NULL,
+    `motos_data` JSON DEFAULT NULL,
+    `equipements` JSON DEFAULT NULL,
+    `claimed` TINYINT(1) DEFAULT 0,
+    `claimed_by` INT UNSIGNED DEFAULT NULL,
+    `claimed_at` DATETIME DEFAULT NULL,
+    `imported_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `expires_at` DATETIME DEFAULT NULL,
+    UNIQUE KEY `idx_panel_email` (`panel_id`, `email`),
+    INDEX `idx_email` (`email`),
+    INDEX `idx_panel_id` (`panel_id`),
+    INDEX `idx_claimed` (`claimed`),
+    INDEX `idx_expires_at` (`expires_at`),
+    FOREIGN KEY (`claimed_by`) REFERENCES `panelists`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
