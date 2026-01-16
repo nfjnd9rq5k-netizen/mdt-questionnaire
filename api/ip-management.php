@@ -60,19 +60,6 @@ function isIpAllowed($ip) {
 }
 
 /**
- * Ajoute une IP en attente
- */
-function addPendingIp($ip, $username = null) {
-    $existing = dbQueryOne("SELECT id FROM pending_ips WHERE ip_address = ?", [$ip]);
-    if (!$existing) {
-        dbExecute(
-            "INSERT INTO pending_ips (ip_address, requested_by) VALUES (?, ?)",
-            [$ip, $username]
-        );
-    }
-}
-
-/**
  * Approuve une IP
  */
 function approveIp($ip, $name = '') {

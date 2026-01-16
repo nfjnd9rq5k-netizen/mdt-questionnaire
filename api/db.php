@@ -103,22 +103,6 @@ function dbRollback(): void {
 }
 
 // ============================================================
-// Fonctions legacy pour la migration (lecture des anciens fichiers)
-// ============================================================
-
-function decryptLegacyData(string $encryptedData): ?array {
-    $key = getEncryptionKey();
-    if (empty($key)) return null;
-    
-    $parts = explode('::', base64_decode($encryptedData), 2);
-    if (count($parts) !== 2) return null;
-    
-    list($iv, $encrypted) = $parts;
-    $decrypted = openssl_decrypt($encrypted, 'AES-256-CBC', $key, 0, $iv);
-    return $decrypted ? json_decode($decrypted, true) : null;
-}
-
-// ============================================================
 // Test de connexion (accès direct à ce fichier)
 // ============================================================
 

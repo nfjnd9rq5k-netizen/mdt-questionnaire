@@ -91,17 +91,6 @@ body {
     font-size: 0.95rem;
 }
 
-.header .reward {
-    display: inline-block;
-    margin-top: 12px;
-    padding: 8px 16px;
-    background: var(--primary-light);
-    color: var(--primary-dark);
-    font-weight: 600;
-    border-radius: 20px;
-    font-size: 0.9rem;
-}
-
 /* Progress Bar */
 .progress-container {
     margin-bottom: 24px;
@@ -136,10 +125,6 @@ body {
     box-shadow: var(--shadow-lg);
     padding: 32px;
     margin-bottom: 24px;
-}
-
-.card-sm {
-    padding: 24px;
 }
 
 /* Horaires */
@@ -228,17 +213,6 @@ body {
 }
 
 /* Question */
-.question-badge {
-    display: inline-block;
-    padding: 6px 12px;
-    background: var(--primary-light);
-    color: var(--primary-dark);
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: 20px;
-    margin-bottom: 12px;
-}
-
 .question-title {
     font-size: 1.25rem;
     font-weight: 700;
@@ -292,11 +266,6 @@ body {
     background: var(--primary-light);
 }
 
-.option-label.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 .option-input {
     width: 20px;
     height: 20px;
@@ -309,17 +278,6 @@ body {
 .option-text {
     flex: 1;
     color: var(--gray-700);
-}
-
-.option-stop {
-    margin-left: auto;
-    padding: 4px 10px;
-    background: var(--danger-light);
-    color: var(--danger);
-    font-size: 0.7rem;
-    font-weight: 700;
-    border-radius: 4px;
-    flex-shrink: 0;
 }
 
 .option-extra-input {
@@ -471,15 +429,6 @@ body {
     transform: scale(0.98);
 }
 
-.btn-export {
-    background: var(--success);
-    color: white;
-}
-
-.btn-export:hover {
-    background: #059669;
-}
-
 /* Result Screens */
 .result-screen {
     text-align: center;
@@ -515,15 +464,6 @@ body {
     color: var(--gray-600);
     margin-bottom: 24px;
     line-height: 1.7;
-}
-
-.result-details {
-    background: var(--gray-50);
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 24px;
-    font-size: 0.9rem;
-    color: var(--gray-600);
 }
 
 /* Participant Info Footer */

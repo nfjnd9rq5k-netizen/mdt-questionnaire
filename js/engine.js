@@ -339,7 +339,7 @@ class QuestionnaireEngine {
     }
 
     renderSignaletique() {
-        const { studyTitle, studyDate, reward, duration, horaires, hideHoraires, horaireMessage, anonymousMode } = this.config;
+        const { studyTitle, studyDate, horaires, hideHoraires, horaireMessage, anonymousMode } = this.config;
         
         let horairesSection = '';
         if (hideHoraires) {
@@ -516,7 +516,7 @@ class QuestionnaireEngine {
                         return;
                     }
                 } catch (e) {
-                    console.log('Vérification anti-doublon non disponible');
+                    // Vérification anti-doublon non disponible
                 }
                 
                 btn.textContent = 'Commencer';
