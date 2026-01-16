@@ -2,6 +2,8 @@
 /**
  * PAGE DE CONNEXION ADMIN - VERSION MYSQL
  */
+// Configure session cookie to be accessible from all paths (fix for cross-directory AJAX)
+session_set_cookie_params(['path' => '/', 'httponly' => true, 'samesite' => 'Strict']);
 session_start();
 require_once '../api/config.php';
 require_once '../api/db.php';

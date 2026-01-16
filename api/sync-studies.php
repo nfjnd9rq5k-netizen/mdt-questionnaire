@@ -9,10 +9,12 @@
  * ============================================================
  */
 
-session_start();
-header('Content-Type: application/json; charset=utf-8');
-
 require_once 'db.php';
+require_once 'security.php';
+
+// Démarrer la session sécurisée (cookie accessible depuis tous les chemins)
+secureSessionStart();
+header('Content-Type: application/json; charset=utf-8');
 
 $studiesDir = __DIR__ . '/../studies';
 $results = [

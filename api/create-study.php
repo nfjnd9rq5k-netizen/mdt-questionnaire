@@ -5,10 +5,12 @@
  * ============================================================
  */
 
-session_start();
-header('Content-Type: application/json');
-
 require_once 'db.php';
+require_once 'security.php';
+
+// Démarrer la session sécurisée (cookie accessible depuis tous les chemins)
+secureSessionStart();
+header('Content-Type: application/json');
 
 // Vérification authentification
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {

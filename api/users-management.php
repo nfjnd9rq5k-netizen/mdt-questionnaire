@@ -14,10 +14,12 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 
 try {
 
-session_start();
 require_once 'config.php';
 require_once 'db.php';
 require_once 'security.php';
+
+// Démarrer la session sécurisée (cookie accessible depuis tous les chemins)
+secureSessionStart();
 
 header('Content-Type: application/json');
 

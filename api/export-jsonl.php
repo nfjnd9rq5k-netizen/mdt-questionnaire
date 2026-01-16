@@ -20,8 +20,11 @@
  * ============================================================
  */
 
-session_start();
 require_once 'db.php';
+require_once 'security.php';
+
+// Démarrer la session sécurisée (cookie accessible depuis tous les chemins)
+secureSessionStart();
 
 // Vérification authentification
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {

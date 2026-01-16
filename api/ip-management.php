@@ -2,9 +2,12 @@
 /**
  * API GESTION DES IPS - VERSION MYSQL
  */
-session_start();
 require_once 'config.php';
 require_once 'db.php';
+require_once 'security.php';
+
+// Démarrer la session sécurisée (cookie accessible depuis tous les chemins)
+secureSessionStart();
 
 header('Content-Type: application/json');
 

@@ -3,6 +3,8 @@ header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 header("Expires: 0");
+// Configure session cookie to be accessible from all paths (fix for cross-directory AJAX)
+session_set_cookie_params(['path' => '/', 'httponly' => true, 'samesite' => 'Strict']);
 session_start();
 require_once '../api/config.php';
 require_once '../api/db.php';

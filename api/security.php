@@ -1,13 +1,33 @@
 <?php
 /**
  * ============================================================
- * SECURITE - CSRF & CORS
+ * SECURITE - CSRF & CORS & SESSION
  * ============================================================
  *
  * Ce fichier centralise la gestion de la sécurité :
+ * - Configuration de session sécurisée
  * - Tokens CSRF pour protéger les actions admin
  * - Configuration CORS pour contrôler les origines autorisées
  */
+
+// ============================================================
+// CONFIGURATION SESSION SÉCURISÉE
+// ============================================================
+
+/**
+ * Démarre une session sécurisée avec la configuration correcte
+ * Le cookie de session est accessible depuis tous les chemins du site
+ */
+function secureSessionStart(): void {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_set_cookie_params([
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Strict'
+        ]);
+        session_start();
+    }
+}
 
 // ============================================================
 // CONFIGURATION CORS
