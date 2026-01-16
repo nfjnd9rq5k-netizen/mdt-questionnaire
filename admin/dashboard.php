@@ -508,177 +508,276 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
         // ============================================================
         // DASHBOARD DATA IA - Métriques spécifiques pour la collecte de données
         // ============================================================
+        // DASHBOARD IA - MÉTRIQUES DE QUALITÉ AVANCÉES v2.0
+        // ============================================================
         function renderIADashboard() {
-            // Filtrer uniquement les études de type data_collection
             const iaStudies = (allData.studies || []).filter(s => s.studyType === 'data_collection' && s.status !== 'closed');
             const closedIaStudies = (allData.studies || []).filter(s => s.studyType === 'data_collection' && s.status === 'closed');
-            
-            // Calculer les métriques globales
-            let totalParticipants = 0, totalTexts = 0, totalQualitySum = 0, totalTrustSum = 0, totalAttentionSum = 0;
-            let participantsWithQuality = 0;
-            
+
+            // Calculer les métriques globales avec le nouveau système
+            let totalParticipants = 0, totalTexts = 0, totalWords = 0;
+            let sumQuality = 0, sumBehavior = 0, sumContent = 0, sumAttention = 0;
+            let participantsWithData = 0;
+            const gradeDistribution = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+            const allFlags = {};
+            let totalFlags = 0;
+
             iaStudies.forEach(s => {
                 const qualifies = s.qualifies || [];
                 totalParticipants += qualifies.length;
                 qualifies.forEach(p => {
-                    if (p.quality_score !== undefined && p.quality_score !== null) {
-                        totalQualitySum += parseFloat(p.quality_score) || 0;
-                        participantsWithQuality++;
+                    const qd = p.qualityData || {};
+                    if (qd.overallQualityScore !== undefined) {
+                        sumQuality += qd.overallQualityScore;
+                        sumBehavior += qd.behaviorScore || 0;
+                        sumContent += qd.contentScore || 0;
+                        sumAttention += qd.attentionScore || 0;
+                        participantsWithData++;
+
+                        // Distribution des grades
+                        const grade = qd.qualityGrade || 'F';
+                        gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
+
+                        // Collecter les flags
+                        (qd.flags || []).forEach(flag => {
+                            const flagName = flag.split(':')[0];
+                            allFlags[flagName] = (allFlags[flagName] || 0) + 1;
+                            totalFlags++;
+                        });
                     }
-                    if (p.trust_score !== undefined) totalTrustSum += parseFloat(p.trust_score) || 0;
-                    if (p.attention_score !== undefined) totalAttentionSum += parseFloat(p.attention_score) || 0;
-                    if (p.texts_count !== undefined) totalTexts += parseInt(p.texts_count) || 0;
+                    totalTexts += qd.totalTextResponses || 0;
+                    totalWords += qd.totalWords || 0;
                 });
             });
-            
-            const avgQuality = participantsWithQuality > 0 ? (totalQualitySum / participantsWithQuality).toFixed(1) : '—';
-            const avgTrust = participantsWithQuality > 0 ? (totalTrustSum / participantsWithQuality).toFixed(1) : '—';
-            const avgAttention = participantsWithQuality > 0 ? (totalAttentionSum / participantsWithQuality).toFixed(0) : '—';
-            
-            // Calculer la distribution des scores de qualité
-            const qualityDistribution = { excellent: 0, good: 0, average: 0, poor: 0 };
-            iaStudies.forEach(s => {
-                (s.qualifies || []).forEach(p => {
-                    const q = parseFloat(p.quality_score) || 0;
-                    if (q >= 8) qualityDistribution.excellent++;
-                    else if (q >= 6) qualityDistribution.good++;
-                    else if (q >= 4) qualityDistribution.average++;
-                    else if (q > 0) qualityDistribution.poor++;
-                });
-            });
-            
+
+            const avgQuality = participantsWithData > 0 ? Math.round(sumQuality / participantsWithData) : 0;
+            const avgBehavior = participantsWithData > 0 ? Math.round(sumBehavior / participantsWithData) : 0;
+            const avgContent = participantsWithData > 0 ? Math.round(sumContent / participantsWithData) : 0;
+            const avgAttention = participantsWithData > 0 ? Math.round(sumAttention / participantsWithData) : 0;
+
+            // Couleur selon le score
+            const getScoreColor = (score) => score >= 80 ? 'text-green-600' : score >= 60 ? 'text-amber-600' : 'text-red-600';
+            const getScoreBg = (score) => score >= 80 ? 'from-green-50 to-emerald-50 border-green-200' : score >= 60 ? 'from-amber-50 to-yellow-50 border-amber-200' : 'from-red-50 to-rose-50 border-red-200';
+            const getGradeColor = (grade) => ({ A: 'bg-green-500', B: 'bg-blue-500', C: 'bg-amber-500', D: 'bg-orange-500', F: 'bg-red-500' }[grade] || 'bg-gray-500');
+
             let html = `
             <!-- En-tête avec icône IA -->
-            <div class="mb-6 flex items-center gap-3">
-                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg">🤖</div>
-                <div>
-                    <h2 class="text-xl font-bold text-gray-800">Collecte de données IA</h2>
-                    <p class="text-sm text-gray-500">Métriques pour l'entraînement de modèles</p>
+            <div class="mb-6 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg">🤖</div>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Data Quality Dashboard</h2>
+                        <p class="text-sm text-gray-500">Métriques avancées pour validation des données IA</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="px-3 py-1 bg-purple-100 text-purple-700 text-sm font-medium rounded-full">${totalParticipants} participants</span>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">${totalTexts} textes</span>
                 </div>
             </div>
-            
-            <!-- Stats principales -->
-            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
-                <div class="card p-4 bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-                    <p class="text-xs text-purple-600 uppercase tracking-wide mb-1 font-medium">Études actives</p>
-                    <p class="text-2xl md:text-3xl font-bold text-purple-700">${iaStudies.length}</p>
+
+            <!-- Scores principaux -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+                <div class="card p-4 bg-gradient-to-br ${getScoreBg(avgQuality)}">
+                    <p class="text-xs text-gray-600 uppercase tracking-wide mb-1 font-medium">Score Global</p>
+                    <div class="flex items-end gap-2">
+                        <p class="text-3xl font-bold ${getScoreColor(avgQuality)}">${avgQuality}</p>
+                        <p class="text-lg text-gray-400 mb-1">/100</p>
+                    </div>
+                    <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full ${avgQuality >= 80 ? 'bg-green-500' : avgQuality >= 60 ? 'bg-amber-500' : 'bg-red-500'} rounded-full" style="width: ${avgQuality}%"></div>
+                    </div>
                 </div>
-                <div class="card p-4 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-                    <p class="text-xs text-blue-600 uppercase tracking-wide mb-1 font-medium">Participants</p>
-                    <p class="text-2xl md:text-3xl font-bold text-blue-700">${totalParticipants}</p>
+                <div class="card p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                    <p class="text-xs text-blue-600 uppercase tracking-wide mb-1 font-medium">Comportement</p>
+                    <div class="flex items-end gap-2">
+                        <p class="text-3xl font-bold ${getScoreColor(avgBehavior)}">${avgBehavior}</p>
+                        <p class="text-lg text-gray-400 mb-1">/100</p>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Trust, focus, activité</p>
                 </div>
-                <div class="card p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-                    <p class="text-xs text-green-600 uppercase tracking-wide mb-1 font-medium">Score Qualité</p>
-                    <p class="text-2xl md:text-3xl font-bold text-green-700">${avgQuality}<span class="text-lg text-green-500">/10</span></p>
+                <div class="card p-4 bg-gradient-to-br from-purple-50 to-fuchsia-50 border-purple-200">
+                    <p class="text-xs text-purple-600 uppercase tracking-wide mb-1 font-medium">Contenu</p>
+                    <div class="flex items-end gap-2">
+                        <p class="text-3xl font-bold ${getScoreColor(avgContent)}">${avgContent}</p>
+                        <p class="text-lg text-gray-400 mb-1">/100</p>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Qualité des textes</p>
                 </div>
-                <div class="card p-4 bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200">
-                    <p class="text-xs text-amber-600 uppercase tracking-wide mb-1 font-medium">Trust Score</p>
-                    <p class="text-2xl md:text-3xl font-bold text-amber-700">${avgTrust}<span class="text-lg text-amber-500">/10</span></p>
-                </div>
-                <div class="card p-4 bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200">
-                    <p class="text-xs text-rose-600 uppercase tracking-wide mb-1 font-medium">Textes générés</p>
-                    <p class="text-2xl md:text-3xl font-bold text-rose-700">${totalTexts}</p>
+                <div class="card p-4 bg-gradient-to-br from-cyan-50 to-sky-50 border-cyan-200">
+                    <p class="text-xs text-cyan-600 uppercase tracking-wide mb-1 font-medium">Attention</p>
+                    <div class="flex items-end gap-2">
+                        <p class="text-3xl font-bold ${getScoreColor(avgAttention)}">${avgAttention}</p>
+                        <p class="text-lg text-gray-400 mb-1">/100</p>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Checks réussis</p>
                 </div>
             </div>
-            
+
             <!-- Grille principale -->
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
                 <!-- Études IA en cours -->
                 <div class="xl:col-span-2 card p-4 md:p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="font-semibold text-gray-800">Études en cours</h3>
-                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">${iaStudies.length} active${iaStudies.length > 1 ? 's' : ''}</span>
+                        <h3 class="font-semibold text-gray-800 flex items-center gap-2">
+                            <span>📊</span> Études actives
+                        </h3>
+                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">${iaStudies.length}</span>
                     </div>
-                    ${iaStudies.length === 0 ? '<p class="text-gray-400 text-sm text-center py-8">Aucune étude IA active</p>' : 
+                    ${iaStudies.length === 0 ? '<p class="text-gray-400 text-sm text-center py-8">Aucune étude IA active</p>' :
                     `<div class="space-y-3">
                         ${iaStudies.map(s => {
                             const qualifies = s.qualifies || [];
-                            const avgQ = qualifies.length > 0 ? (qualifies.reduce((sum, p) => sum + (parseFloat(p.quality_score) || 0), 0) / qualifies.length).toFixed(1) : '—';
-                            const totalT = qualifies.reduce((sum, p) => sum + (parseInt(p.texts_count) || 0), 0);
-                            return `<div class="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl hover:shadow-md cursor-pointer transition" onclick="switchTab('dataia', '${s.studyId}')">
-                                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow">${s.studyName.substring(0,2).toUpperCase()}</div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="font-semibold text-gray-800 truncate">${esc(s.studyName)}</p>
-                                    <div class="flex items-center gap-4 mt-1 text-xs">
-                                        <span class="text-purple-600">👥 ${qualifies.length} participants</span>
-                                        <span class="text-green-600">⭐ ${avgQ}/10 qualité</span>
-                                        <span class="text-blue-600">📝 ${totalT} textes</span>
+                            let studyAvgQ = 0, studyTexts = 0, studyWords = 0, studyFlags = 0;
+                            qualifies.forEach(p => {
+                                const qd = p.qualityData || {};
+                                studyAvgQ += qd.overallQualityScore || 0;
+                                studyTexts += qd.totalTextResponses || 0;
+                                studyWords += qd.totalWords || 0;
+                                studyFlags += qd.flagsCount || 0;
+                            });
+                            studyAvgQ = qualifies.length > 0 ? Math.round(studyAvgQ / qualifies.length) : 0;
+                            const gradeCount = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+                            qualifies.forEach(p => { const g = p.qualityData?.qualityGrade || 'F'; gradeCount[g]++; });
+
+                            return `<div class="p-4 bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl hover:shadow-md cursor-pointer transition border border-gray-100" onclick="switchTab('dataia', '${s.studyId}')">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow">
+                                        <span class="text-2xl">${studyAvgQ >= 80 ? '🟢' : studyAvgQ >= 60 ? '🟡' : '🔴'}</span>
                                     </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="flex gap-2">
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-semibold text-gray-800">${esc(s.studyName)}</p>
+                                        <div class="flex items-center gap-3 mt-1">
+                                            <span class="text-xs px-2 py-0.5 rounded ${studyAvgQ >= 80 ? 'bg-green-100 text-green-700' : studyAvgQ >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${studyAvgQ}% qualité</span>
+                                            <span class="text-xs text-gray-500">👥 ${qualifies.length}</span>
+                                            <span class="text-xs text-gray-500">📝 ${studyTexts} textes</span>
+                                            <span class="text-xs text-gray-500">📊 ${studyWords} mots</span>
+                                            ${studyFlags > 0 ? `<span class="text-xs text-red-500">⚠️ ${studyFlags} alertes</span>` : ''}
+                                        </div>
+                                        <div class="flex items-center gap-1 mt-2">
+                                            ${['A','B','C','D','F'].map(g => gradeCount[g] > 0 ? `<span class="text-xs px-1.5 py-0.5 rounded ${getGradeColor(g)} text-white">${g}:${gradeCount[g]}</span>` : '').join('')}
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col gap-2">
                                         <button onclick="event.stopPropagation(); exportJSONL('${s.studyId}')" class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">JSONL</button>
+                                        <button onclick="event.stopPropagation(); exportStudy('${s.studyId}', 'qualifies')" class="px-3 py-1.5 text-xs bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">Excel</button>
                                     </div>
                                 </div>
                             </div>`;
                         }).join('')}
                     </div>`}
                 </div>
-                
-                <!-- Distribution Qualité -->
-                <div class="card p-4 md:p-6">
-                    <h3 class="font-semibold text-gray-800 mb-4">Distribution Qualité</h3>
-                    <div class="space-y-3">
-                        <div class="flex items-center gap-3">
-                            <span class="text-sm w-20 text-gray-600">Excellent</span>
-                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.excellent / participantsWithQuality * 100) : 0}%"></div>
-                            </div>
-                            <span class="text-sm font-semibold text-green-600 w-8">${qualityDistribution.excellent}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-sm w-20 text-gray-600">Bon</span>
-                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.good / participantsWithQuality * 100) : 0}%"></div>
-                            </div>
-                            <span class="text-sm font-semibold text-blue-600 w-8">${qualityDistribution.good}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-sm w-20 text-gray-600">Moyen</span>
-                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-amber-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.average / participantsWithQuality * 100) : 0}%"></div>
-                            </div>
-                            <span class="text-sm font-semibold text-amber-600 w-8">${qualityDistribution.average}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-sm w-20 text-gray-600">Faible</span>
-                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-red-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.poor / participantsWithQuality * 100) : 0}%"></div>
-                            </div>
-                            <span class="text-sm font-semibold text-red-600 w-8">${qualityDistribution.poor}</span>
+
+                <!-- Panel de droite : Grades + Alertes -->
+                <div class="space-y-4">
+                    <!-- Distribution des Grades -->
+                    <div class="card p-4 md:p-6">
+                        <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <span>🎯</span> Distribution des Grades
+                        </h3>
+                        <div class="space-y-3">
+                            ${['A','B','C','D','F'].map(grade => {
+                                const count = gradeDistribution[grade] || 0;
+                                const percent = participantsWithData > 0 ? Math.round(count / participantsWithData * 100) : 0;
+                                const labels = { A: 'Excellent (≥90%)', B: 'Bon (≥80%)', C: 'Correct (≥70%)', D: 'Faible (≥50%)', F: 'Rejeté (<50%)' };
+                                return `<div class="flex items-center gap-3">
+                                    <span class="w-6 h-6 ${getGradeColor(grade)} text-white rounded flex items-center justify-center text-xs font-bold">${grade}</span>
+                                    <div class="flex-1">
+                                        <div class="flex justify-between text-xs mb-1">
+                                            <span class="text-gray-600">${labels[grade]}</span>
+                                            <span class="font-medium">${count}</span>
+                                        </div>
+                                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div class="h-full ${getGradeColor(grade)} rounded-full transition-all" style="width: ${percent}%"></div>
+                                        </div>
+                                    </div>
+                                </div>`;
+                            }).join('')}
                         </div>
                     </div>
-                    <div class="mt-4 pt-4 border-t border-gray-100">
-                        <p class="text-xs text-gray-500">Excellent ≥8 | Bon ≥6 | Moyen ≥4 | Faible <4</p>
+
+                    <!-- Alertes de qualité -->
+                    <div class="card p-4 md:p-6">
+                        <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <span>⚠️</span> Alertes Qualité
+                            ${totalFlags > 0 ? `<span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">${totalFlags}</span>` : ''}
+                        </h3>
+                        ${Object.keys(allFlags).length === 0 ?
+                            '<p class="text-green-600 text-sm text-center py-4">✅ Aucune alerte détectée</p>' :
+                            `<div class="space-y-2">
+                                ${Object.entries(allFlags).sort((a,b) => b[1] - a[1]).slice(0, 8).map(([flag, count]) => {
+                                    const flagLabels = {
+                                        'SPEEDRUN_DETECTED': '⚡ Réponse trop rapide',
+                                        'EXCESSIVE_PASTE': '📋 Copier-coller excessif',
+                                        'EXCESSIVE_TAB_SWITCHES': '🔄 Changements onglets',
+                                        'ATTENTION_FAILED': '❌ Attention check échoué',
+                                        'SESSION_TOO_SHORT': '⏱️ Session trop courte',
+                                        'LOW_KEYSTROKE_RATIO': '⌨️ Peu de frappe clavier',
+                                        'DUPLICATE_RESPONSES': '🔁 Réponses dupliquées',
+                                        'MANY_SHORT_RESPONSES': '📝 Réponses courtes'
+                                    };
+                                    return `<div class="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+                                        <span class="text-xs text-red-700">${flagLabels[flag] || flag}</span>
+                                        <span class="text-xs font-bold text-red-600">${count}</span>
+                                    </div>`;
+                                }).join('')}
+                            </div>`
+                        }
+                    </div>
+
+                    <!-- Stats globales -->
+                    <div class="card p-4 md:p-6 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
+                        <h3 class="font-semibold text-indigo-800 mb-3">📈 Métriques globales</h3>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-white/60 rounded-lg p-2 text-center">
+                                <p class="text-xs text-gray-500">Total mots</p>
+                                <p class="font-bold text-indigo-700">${totalWords.toLocaleString()}</p>
+                            </div>
+                            <div class="bg-white/60 rounded-lg p-2 text-center">
+                                <p class="text-xs text-gray-500">Moy. mots/texte</p>
+                                <p class="font-bold text-indigo-700">${totalTexts > 0 ? Math.round(totalWords / totalTexts) : 0}</p>
+                            </div>
+                            <div class="bg-white/60 rounded-lg p-2 text-center">
+                                <p class="text-xs text-gray-500">Grade A+B</p>
+                                <p class="font-bold text-green-600">${gradeDistribution.A + gradeDistribution.B}</p>
+                            </div>
+                            <div class="bg-white/60 rounded-lg p-2 text-center">
+                                <p class="text-xs text-gray-500">Grade D+F</p>
+                                <p class="font-bold text-red-600">${gradeDistribution.D + gradeDistribution.F}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Section Export global -->
+
+            <!-- Section Export -->
             <div class="mt-6 card p-4 md:p-6 bg-gradient-to-r from-slate-50 to-gray-50">
                 <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
-                        <h3 class="font-semibold text-gray-800">Export des données</h3>
-                        <p class="text-sm text-gray-500 mt-1">Exportez toutes les données au format JSONL pour l'entraînement</p>
+                        <h3 class="font-semibold text-gray-800 flex items-center gap-2">📥 Export des données</h3>
+                        <p class="text-sm text-gray-500 mt-1">Exportez les données filtrées par qualité pour l'entraînement</p>
                     </div>
-                    <div class="flex gap-3">
-                        ${iaStudies.map(s => `<button onclick="exportJSONL('${s.studyId}')" class="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2">
-                            <span>📥</span> ${s.studyName.substring(0, 15)}${s.studyName.length > 15 ? '...' : ''}
+                    <div class="flex flex-wrap gap-2">
+                        ${iaStudies.map(s => `<button onclick="exportJSONL('${s.studyId}')" class="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                            📥 ${s.studyName.substring(0, 12)}${s.studyName.length > 12 ? '...' : ''}
                         </button>`).join('')}
                     </div>
                 </div>
             </div>
-            
+
             <!-- Archives IA -->
             ${closedIaStudies.length > 0 ? `
             <div class="mt-6 card p-4 md:p-6">
-                <h3 class="font-semibold text-gray-800 mb-4">Études terminées (${closedIaStudies.length})</h3>
+                <h3 class="font-semibold text-gray-800 mb-4">📁 Études terminées (${closedIaStudies.length})</h3>
                 <div class="space-y-2">
                     ${closedIaStudies.map(s => {
                         const qualifies = s.qualifies || [];
-                        return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        let avgQ = 0;
+                        qualifies.forEach(p => avgQ += p.qualityData?.overallQualityScore || 0);
+                        avgQ = qualifies.length > 0 ? Math.round(avgQ / qualifies.length) : 0;
+                        return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-white font-bold text-xs">${s.studyName.substring(0,2).toUpperCase()}</div>
+                                <div class="w-8 h-8 ${avgQ >= 70 ? 'bg-green-500' : 'bg-gray-400'} rounded-lg flex items-center justify-center text-white font-bold text-xs">${avgQ}%</div>
                                 <span class="text-gray-600">${esc(s.studyName)}</span>
                                 <span class="text-xs text-gray-400">(${qualifies.length} participants)</span>
                             </div>
@@ -688,7 +787,7 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
                 </div>
             </div>` : ''}
             `;
-            
+
             document.getElementById('main-content').innerHTML = html;
         }
 
@@ -743,8 +842,8 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             const isDataCollection = study.studyType === 'data_collection';
 
             // Headers différents selon le type d'étude
-            const qualifiesHeaders = isDataCollection 
-                ? `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Pseudo</th><th class="px-4 py-3 text-left">Score Qualité</th><th class="px-4 py-3 text-left">Trust Score</th><th class="px-4 py-3 text-left">Attention</th><th class="px-4 py-3 text-left">Textes</th><th class="px-4 py-3 text-left">Date</th><th class="px-4 py-3 text-left">Actions</th>`
+            const qualifiesHeaders = isDataCollection
+                ? `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Grade</th><th class="px-4 py-3 text-left">Score</th><th class="px-4 py-3 text-left">Comportement</th><th class="px-4 py-3 text-left">Contenu</th><th class="px-4 py-3 text-left">Attention</th><th class="px-4 py-3 text-left">Textes</th><th class="px-4 py-3 text-left">Alertes</th><th class="px-4 py-3 text-left">Actions</th>`
                 : `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Nom</th><th class="px-4 py-3 text-left">Prénom</th><th class="px-4 py-3 text-left">Email</th><th class="px-4 py-3 text-left">Téléphone</th><th class="px-4 py-3 text-left">Ville</th><th class="px-4 py-3 text-left">Horaire</th><th class="px-4 py-3 text-left">Actions</th>`;
             
             const encoursHeaders = isDataCollection
@@ -814,33 +913,46 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
 
             if (type === 'qualifies') {
                 if (isDataCollection) {
-                    // Rendu spécial pour data_collection
-                    tbody.innerHTML = pageData.map((p, i) => { 
+                    // Rendu spécial pour data_collection avec métriques qualité détaillées
+                    tbody.innerHTML = pageData.map((p, i) => {
                         const gi = start + i;
                         const qd = p.qualityData || {};
-                        const trustScore = qd.trustScore || (p.behaviorMetrics?.trustScore) || '-';
-                        const qualityScore = qd.overallQualityScore || '-';
-                        const attChecks = `${qd.attentionChecksPassed || 0}/${qd.attentionChecksTotal || 0}`;
-                        const textCount = qd.totalTextResponses || Object.keys(p.reponses || {}).filter(k => {
-                            const v = p.reponses[k];
-                            return v && v.value && typeof v.value === 'string' && v.value.length > 50;
-                        }).length;
-                        const pseudo = p.nom !== 'N/A' ? p.nom : (p.email ? p.email.split('@')[0] : `P${(gi+1).toString().padStart(3,'0')}`);
-                        const dateStr = p.date && p.date !== 'N/A' ? new Date(p.date).toLocaleDateString('fr-FR') : '-';
-                        
-                        // Couleurs pour les scores
-                        const qsColor = qualityScore >= 80 ? 'text-green-600' : qualityScore >= 50 ? 'text-amber-600' : 'text-red-600';
-                        const tsColor = trustScore !== '-' ? (trustScore >= 70 ? 'text-green-600' : trustScore >= 50 ? 'text-amber-600' : 'text-red-600') : 'text-gray-400';
-                        const attColor = qd.attentionChecksPassed === qd.attentionChecksTotal ? 'text-green-600' : 'text-red-600';
-                        
+
+                        // Scores (structure plate depuis admin-data.php)
+                        const overallScore = qd.overallQualityScore ?? '-';
+                        const behaviorScore = qd.behaviorScore ?? '-';
+                        const contentScore = qd.contentScore ?? '-';
+                        const attentionScore = qd.attentionScore ?? '-';
+                        const grade = qd.qualityGrade || 'F';
+                        const textCount = qd.totalTextResponses ?? 0;
+                        const flagsCount = qd.flags?.length ?? qd.flagsCount ?? 0;
+
+                        // Couleurs selon les grades
+                        const gradeColors = {
+                            'A': 'bg-green-100 text-green-800',
+                            'B': 'bg-blue-100 text-blue-800',
+                            'C': 'bg-amber-100 text-amber-800',
+                            'D': 'bg-orange-100 text-orange-800',
+                            'F': 'bg-red-100 text-red-800'
+                        };
+                        const gradeClass = gradeColors[grade] || gradeColors['F'];
+
+                        // Couleurs pour scores numériques
+                        const scoreColor = (s) => s === '-' ? 'text-gray-400' : s >= 80 ? 'text-green-600' : s >= 60 ? 'text-amber-600' : 'text-red-600';
+
+                        // Alertes tooltip
+                        const flagsTooltip = flagsCount > 0 ? qd.flags.join(', ') : 'Aucune alerte';
+                        const flagsClass = flagsCount === 0 ? 'text-green-600' : flagsCount <= 2 ? 'text-amber-600' : 'text-red-600';
+
                         return `<tr data-index="${gi}" class="hover:bg-gray-50">
                             <td class="px-4 py-3 text-sm text-sidebar-active font-mono">P${(gi+1).toString().padStart(3,'0')}</td>
-                            <td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(pseudo)}</td>
-                            <td class="px-4 py-3 text-sm font-bold ${qsColor}">${qualityScore}%</td>
-                            <td class="px-4 py-3 text-sm font-medium ${tsColor}">${trustScore}</td>
-                            <td class="px-4 py-3 text-sm font-medium ${attColor}">${attChecks}</td>
+                            <td class="px-4 py-3"><span class="px-2 py-1 text-xs font-bold rounded ${gradeClass}">${grade}</span></td>
+                            <td class="px-4 py-3 text-sm font-bold ${scoreColor(overallScore)}">${overallScore !== '-' ? overallScore + '%' : '-'}</td>
+                            <td class="px-4 py-3 text-sm font-medium ${scoreColor(behaviorScore)}">${behaviorScore !== '-' ? behaviorScore + '%' : '-'}</td>
+                            <td class="px-4 py-3 text-sm font-medium ${scoreColor(contentScore)}">${contentScore !== '-' ? contentScore + '%' : '-'}</td>
+                            <td class="px-4 py-3 text-sm font-medium ${scoreColor(attentionScore)}">${attentionScore !== '-' ? attentionScore + '%' : '-'}</td>
                             <td class="px-4 py-3 text-sm text-gray-600">${textCount}</td>
-                            <td class="px-4 py-3 text-sm text-gray-500">${dateStr}</td>
+                            <td class="px-4 py-3 text-sm font-medium ${flagsClass}" title="${esc(flagsTooltip)}">${flagsCount}</td>
                             <td class="px-4 py-3"><div class="flex gap-1"><button onclick="showResponses('${studyId}', ${gi}, 'qualifies')" class="px-3 py-1 text-xs btn-secondary rounded">Voir</button>${canEdit ? `<button onclick="deleteParticipant('${studyId}', '${p.id}', 'qualifies')" class="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>` : ''}</div></td>
                         </tr>`;
                     }).join('');

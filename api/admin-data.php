@@ -925,23 +925,65 @@ function getSignaletique($responseInternalId) {
 }
 
 /**
- * Calcule les métriques de qualité pour les études data_collection
+ * Calcule les métriques de qualité avancées pour les études data_collection
+ * Version 2.0 - Métriques complètes pour validation de la qualité des données IA
  */
 function calculateDataQualityMetrics($reponses, $behaviorMetrics, $studyId = '') {
+    $bm = $behaviorMetrics ?? [];
+
+    // === MÉTRIQUES DE BASE ===
     $metrics = [
+        // Attention checks
         'attentionChecksPassed' => 0,
         'attentionChecksTotal' => 0,
-        'trustScore' => $behaviorMetrics['trustScore'] ?? null,
-        'pasteEvents' => $behaviorMetrics['pasteEvents'] ?? 0,
-        'sessionDuration' => $behaviorMetrics['sessionDuration'] ?? null,
-        'tabSwitches' => $behaviorMetrics['tabSwitches'] ?? 0,
+        'attentionScore' => 100,
+
+        // Comportement (depuis engine.js)
+        'trustScore' => $bm['trustScore'] ?? null,
+        'pasteEvents' => $bm['pasteEvents'] ?? 0,
+        'tabSwitches' => $bm['tabSwitches'] ?? 0,
+        'focusLost' => $bm['focusLost'] ?? 0,
+        'mouseMovements' => $bm['mouseMovements'] ?? 0,
+        'scrollEvents' => $bm['scrollEvents'] ?? 0,
+        'keystrokeCount' => $bm['keystrokeCount'] ?? 0,
+
+        // Temps
+        'sessionDuration' => $bm['sessionDuration'] ?? null,
+        'avgTimePerQuestion' => null,
+        'speedrunDetected' => false,
+
+        // Contenu texte
         'totalTextResponses' => 0,
         'avgWordCount' => 0,
+        'minWordCount' => null,
+        'maxWordCount' => null,
+        'totalWords' => 0,
+        'shortResponsesCount' => 0,  // < 10 mots
+        'emptyResponses' => 0,
+
+        // Qualité du texte
+        'repetitionScore' => 100,     // Pénalisé si textes identiques
+        'coherenceScore' => 100,      // Basé sur longueur et variété
+        'diversityScore' => 100,      // Variété du vocabulaire
+
+        // Complétude
+        'totalQuestions' => 0,
+        'answeredQuestions' => 0,
+        'completionRate' => 0,
         'categoriesCompleted' => [],
-        'overallQualityScore' => 100
+
+        // Indicateurs de fraude potentielle
+        'flags' => [],
+        'flagsCount' => 0,
+
+        // Scores composites
+        'behaviorScore' => 100,
+        'contentScore' => 100,
+        'overallQualityScore' => 100,
+        'qualityGrade' => 'A'
     ];
-    
-    // Mapping des réponses correctes par étude
+
+    // === MAPPING DES ATTENTION CHECKS PAR ÉTUDE ===
     $attentionAnswersByStudy = [
         'DATA_IA_JAN2026' => [
             'p1_attention_check_1' => 'blue',
@@ -960,82 +1002,204 @@ function calculateDataQualityMetrics($reponses, $behaviorMetrics, $studyId = '')
             'attention_2' => 'vérifié'
         ]
     ];
-    
-    // Récupérer le mapping pour cette étude
     $attentionAnswers = $attentionAnswersByStudy[$studyId] ?? [];
-    
+
+    // === ANALYSE DES RÉPONSES ===
     $wordCounts = [];
+    $textResponses = [];
     $categories = [];
-    
-    // Analyser les réponses
+    $metrics['totalQuestions'] = count($reponses);
+
     foreach ($reponses as $questionId => $answer) {
-        // Détecter les attention checks (toute question contenant "attention")
+        $metrics['answeredQuestions']++;
+
+        // --- Attention checks ---
         if (strpos($questionId, 'attention') !== false) {
             $metrics['attentionChecksTotal']++;
-            
             $answerValue = $answer['value'] ?? '';
-            
-            // Vérifier si la réponse est correcte selon le mapping de l'étude
+
             if (isset($attentionAnswers[$questionId])) {
                 $expected = $attentionAnswers[$questionId];
                 $actual = is_string($answerValue) ? mb_strtolower(trim($answerValue)) : $answerValue;
                 $expectedLower = is_string($expected) ? mb_strtolower(trim($expected)) : $expected;
-                
-                // Comparaison flexible pour les textes
-                if ($actual === $expectedLower || 
+
+                if ($actual === $expectedLower ||
                     (is_string($actual) && strpos($actual, $expectedLower) !== false)) {
                     $metrics['attentionChecksPassed']++;
                 }
             }
         }
-        
-        // Compter les réponses texte
-        if (isset($answer['value']) && is_string($answer['value']) && strlen($answer['value']) > 50) {
-            $metrics['totalTextResponses']++;
-            $wordCount = str_word_count($answer['value']);
-            $wordCounts[] = $wordCount;
+
+        // --- Analyse des réponses textuelles ---
+        $textValue = $answer['value'] ?? '';
+        if (is_string($textValue) && strlen(trim($textValue)) > 0) {
+            $wordCount = str_word_count($textValue);
+
+            if (strlen($textValue) > 30) {  // Réponse texte significative
+                $metrics['totalTextResponses']++;
+                $wordCounts[] = $wordCount;
+                $textResponses[] = $textValue;
+                $metrics['totalWords'] += $wordCount;
+
+                if ($wordCount < 10) {
+                    $metrics['shortResponsesCount']++;
+                }
+            }
+        } elseif (!isset($answer['values']) || empty($answer['values'])) {
+            // Réponse vide (ni value ni values)
+            if (!strpos($questionId, 'attention') && !strpos($questionId, 'gold')) {
+                $metrics['emptyResponses']++;
+            }
         }
-        
-        // Identifier les catégories complétées
-        if (preg_match('/^p(\d+)_([a-z]+)_/', $questionId, $m)) {
+
+        // --- Catégories ---
+        if (preg_match('/^p(\d+)_([a-z]+)/', $questionId, $m)) {
             $cat = $m[2];
             if (!in_array($cat, $categories)) {
                 $categories[] = $cat;
             }
         }
     }
-    
-    // Calculer la moyenne de mots
+
+    // === CALCUL DES STATISTIQUES TEXTE ===
     if (count($wordCounts) > 0) {
         $metrics['avgWordCount'] = round(array_sum($wordCounts) / count($wordCounts));
+        $metrics['minWordCount'] = min($wordCounts);
+        $metrics['maxWordCount'] = max($wordCounts);
     }
-    
     $metrics['categoriesCompleted'] = $categories;
-    
-    // Calculer le score de qualité global
-    $qualityScore = 100;
-    
-    // Pénalités attention checks
-    if ($metrics['attentionChecksTotal'] > 0) {
-        $ratio = $metrics['attentionChecksPassed'] / $metrics['attentionChecksTotal'];
-        if ($ratio < 1) {
-            $qualityScore -= (1 - $ratio) * 30;
+    $metrics['completionRate'] = $metrics['totalQuestions'] > 0
+        ? round(($metrics['answeredQuestions'] / $metrics['totalQuestions']) * 100)
+        : 0;
+
+    // === DÉTECTION DES RÉPÉTITIONS ===
+    if (count($textResponses) >= 2) {
+        $duplicates = 0;
+        $seen = [];
+        foreach ($textResponses as $text) {
+            $normalized = mb_strtolower(trim(preg_replace('/\s+/', ' ', $text)));
+            $hash = md5($normalized);
+            if (isset($seen[$hash])) {
+                $duplicates++;
+            }
+            $seen[$hash] = true;
+        }
+        if ($duplicates > 0) {
+            $metrics['repetitionScore'] = max(0, 100 - ($duplicates * 25));
+            $metrics['flags'][] = "DUPLICATE_RESPONSES:$duplicates";
         }
     }
-    
-    // Pénalités comportementales
-    if ($metrics['trustScore'] !== null && $metrics['trustScore'] < 70) {
-        $qualityScore -= (70 - $metrics['trustScore']) / 2;
+
+    // === CALCUL DU TEMPS MOYEN PAR QUESTION ===
+    if ($metrics['sessionDuration'] && $metrics['answeredQuestions'] > 0) {
+        $metrics['avgTimePerQuestion'] = round($metrics['sessionDuration'] / $metrics['answeredQuestions']);
+
+        // Speedrun detection: moins de 3 secondes par question en moyenne
+        if ($metrics['avgTimePerQuestion'] < 3) {
+            $metrics['speedrunDetected'] = true;
+            $metrics['flags'][] = 'SPEEDRUN_DETECTED';
+        }
     }
-    if ($metrics['pasteEvents'] > 5) {
-        $qualityScore -= 10;
+
+    // === SCORE ATTENTION CHECKS ===
+    if ($metrics['attentionChecksTotal'] > 0) {
+        $ratio = $metrics['attentionChecksPassed'] / $metrics['attentionChecksTotal'];
+        $metrics['attentionScore'] = round($ratio * 100);
+        if ($ratio < 1) {
+            $failedCount = $metrics['attentionChecksTotal'] - $metrics['attentionChecksPassed'];
+            $metrics['flags'][] = "ATTENTION_FAILED:$failedCount";
+        }
     }
-    if ($metrics['sessionDuration'] !== null && $metrics['sessionDuration'] < 300) {
-        $qualityScore -= 15;
+
+    // === SCORE COMPORTEMENTAL ===
+    $behaviorScore = 100;
+
+    // Trust score de l'engine
+    if ($metrics['trustScore'] !== null) {
+        $behaviorScore = min($behaviorScore, $metrics['trustScore']);
     }
-    
-    $metrics['overallQualityScore'] = max(0, min(100, round($qualityScore)));
-    
+
+    // Pénalités copier-coller excessif
+    if ($metrics['pasteEvents'] > 10) {
+        $behaviorScore -= 20;
+        $metrics['flags'][] = "EXCESSIVE_PASTE:{$metrics['pasteEvents']}";
+    } elseif ($metrics['pasteEvents'] > 5) {
+        $behaviorScore -= 10;
+    }
+
+    // Pénalités changements d'onglet
+    if ($metrics['tabSwitches'] > 20) {
+        $behaviorScore -= 15;
+        $metrics['flags'][] = "EXCESSIVE_TAB_SWITCHES:{$metrics['tabSwitches']}";
+    } elseif ($metrics['tabSwitches'] > 10) {
+        $behaviorScore -= 8;
+    }
+
+    // Pénalité session trop courte (< 5 min pour questionnaire complet)
+    if ($metrics['sessionDuration'] !== null && $metrics['sessionDuration'] < 300 && $metrics['totalQuestions'] > 20) {
+        $behaviorScore -= 20;
+        $metrics['flags'][] = 'SESSION_TOO_SHORT';
+    }
+
+    // Bonus activité souris/scroll (signe d'engagement réel)
+    if ($metrics['mouseMovements'] > 100 && $metrics['scrollEvents'] > 20) {
+        $behaviorScore = min(100, $behaviorScore + 5);
+    }
+
+    // Absence totale d'activité clavier pour réponses texte = suspect
+    if ($metrics['totalTextResponses'] > 0 && $metrics['keystrokeCount'] < $metrics['totalWords']) {
+        $metrics['flags'][] = 'LOW_KEYSTROKE_RATIO';
+        $behaviorScore -= 15;
+    }
+
+    $metrics['behaviorScore'] = max(0, min(100, round($behaviorScore)));
+
+    // === SCORE CONTENU ===
+    $contentScore = 100;
+
+    // Pénalité réponses courtes
+    if ($metrics['totalTextResponses'] > 0) {
+        $shortRatio = $metrics['shortResponsesCount'] / $metrics['totalTextResponses'];
+        if ($shortRatio > 0.5) {
+            $contentScore -= 20;
+            $metrics['flags'][] = 'MANY_SHORT_RESPONSES';
+        }
+    }
+
+    // Pénalité moyenne de mots trop basse
+    if ($metrics['avgWordCount'] > 0 && $metrics['avgWordCount'] < 15 && $metrics['totalTextResponses'] > 3) {
+        $contentScore -= 15;
+    }
+
+    // Bonus pour réponses substantielles
+    if ($metrics['avgWordCount'] >= 30) {
+        $contentScore = min(100, $contentScore + 10);
+    }
+
+    // Intégrer le score de répétition
+    $contentScore = ($contentScore + $metrics['repetitionScore']) / 2;
+
+    $metrics['contentScore'] = max(0, min(100, round($contentScore)));
+
+    // === SCORE GLOBAL ===
+    // Pondération: Attention 30%, Comportement 35%, Contenu 35%
+    $overallScore = (
+        $metrics['attentionScore'] * 0.30 +
+        $metrics['behaviorScore'] * 0.35 +
+        $metrics['contentScore'] * 0.35
+    );
+
+    $metrics['overallQualityScore'] = max(0, min(100, round($overallScore)));
+    $metrics['flagsCount'] = count($metrics['flags']);
+
+    // === GRADE FINAL ===
+    $score = $metrics['overallQualityScore'];
+    if ($score >= 90) $metrics['qualityGrade'] = 'A';
+    elseif ($score >= 80) $metrics['qualityGrade'] = 'B';
+    elseif ($score >= 70) $metrics['qualityGrade'] = 'C';
+    elseif ($score >= 50) $metrics['qualityGrade'] = 'D';
+    else $metrics['qualityGrade'] = 'F';
+
     return $metrics;
 }
 
