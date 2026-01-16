@@ -514,7 +514,7 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             const iaStudies = (allData.studies || []).filter(s => s.studyType === 'data_collection' && s.status !== 'closed');
             const closedIaStudies = (allData.studies || []).filter(s => s.studyType === 'data_collection' && s.status === 'closed');
 
-            // Calculer les métriques globales avec le nouveau système
+            // Calculer les métriques globales
             let totalParticipants = 0, totalTexts = 0, totalWords = 0;
             let sumQuality = 0, sumBehavior = 0, sumContent = 0, sumAttention = 0;
             let participantsWithData = 0;
@@ -533,12 +533,8 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
                         sumContent += qd.contentScore || 0;
                         sumAttention += qd.attentionScore || 0;
                         participantsWithData++;
-
-                        // Distribution des grades
                         const grade = qd.qualityGrade || 'F';
                         gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
-
-                        // Collecter les flags
                         (qd.flags || []).forEach(flag => {
                             const flagName = flag.split(':')[0];
                             allFlags[flagName] = (allFlags[flagName] || 0) + 1;
@@ -555,112 +551,82 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             const avgContent = participantsWithData > 0 ? Math.round(sumContent / participantsWithData) : 0;
             const avgAttention = participantsWithData > 0 ? Math.round(sumAttention / participantsWithData) : 0;
 
-            // Couleur selon le score
-            const getScoreColor = (score) => score >= 80 ? 'text-green-600' : score >= 60 ? 'text-amber-600' : 'text-red-600';
-            const getScoreBg = (score) => score >= 80 ? 'from-green-50 to-emerald-50 border-green-200' : score >= 60 ? 'from-amber-50 to-yellow-50 border-amber-200' : 'from-red-50 to-rose-50 border-red-200';
-            const getGradeColor = (grade) => ({ A: 'bg-green-500', B: 'bg-blue-500', C: 'bg-amber-500', D: 'bg-orange-500', F: 'bg-red-500' }[grade] || 'bg-gray-500');
+            const getScoreClass = (score) => score >= 80 ? 'text-green-600' : score >= 60 ? 'text-amber-600' : 'text-red-500';
+            const getGradeBg = (grade) => ({ A: 'bg-green-600', B: 'bg-blue-600', C: 'bg-amber-500', D: 'bg-orange-500', F: 'bg-red-500' }[grade] || 'bg-gray-400');
 
             let html = `
-            <!-- En-tête avec icône IA -->
-            <div class="mb-6 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg">🤖</div>
+            <div class="mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h2 class="text-xl font-bold text-gray-800">Data Quality Dashboard</h2>
-                        <p class="text-sm text-gray-500">Métriques avancées pour validation des données IA</p>
+                        <h2 class="text-lg font-semibold text-gray-800">Collecte de données IA</h2>
+                        <p class="text-sm text-gray-500">${totalParticipants} participants &middot; ${totalTexts} réponses textuelles</p>
                     </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="px-3 py-1 bg-purple-100 text-purple-700 text-sm font-medium rounded-full">${totalParticipants} participants</span>
-                    <span class="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">${totalTexts} textes</span>
                 </div>
             </div>
 
-            <!-- Scores principaux -->
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-                <div class="card p-4 bg-gradient-to-br ${getScoreBg(avgQuality)}">
-                    <p class="text-xs text-gray-600 uppercase tracking-wide mb-1 font-medium">Score Global</p>
-                    <div class="flex items-end gap-2">
-                        <p class="text-3xl font-bold ${getScoreColor(avgQuality)}">${avgQuality}</p>
-                        <p class="text-lg text-gray-400 mb-1">/100</p>
-                    </div>
-                    <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div class="h-full ${avgQuality >= 80 ? 'bg-green-500' : avgQuality >= 60 ? 'bg-amber-500' : 'bg-red-500'} rounded-full" style="width: ${avgQuality}%"></div>
-                    </div>
+            <!-- Scores -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="card p-4">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Score global</p>
+                    <p class="text-2xl font-bold ${getScoreClass(avgQuality)}">${avgQuality}<span class="text-sm font-normal text-gray-400">/100</span></p>
+                    <div class="mt-2 h-1.5 bg-gray-100 rounded-full"><div class="h-full rounded-full ${avgQuality >= 80 ? 'bg-green-500' : avgQuality >= 60 ? 'bg-amber-500' : 'bg-red-500'}" style="width:${avgQuality}%"></div></div>
                 </div>
-                <div class="card p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-                    <p class="text-xs text-blue-600 uppercase tracking-wide mb-1 font-medium">Comportement</p>
-                    <div class="flex items-end gap-2">
-                        <p class="text-3xl font-bold ${getScoreColor(avgBehavior)}">${avgBehavior}</p>
-                        <p class="text-lg text-gray-400 mb-1">/100</p>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">Trust, focus, activité</p>
+                <div class="card p-4">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Comportement</p>
+                    <p class="text-2xl font-bold ${getScoreClass(avgBehavior)}">${avgBehavior}<span class="text-sm font-normal text-gray-400">/100</span></p>
+                    <p class="text-xs text-gray-400 mt-1">Trust score, focus</p>
                 </div>
-                <div class="card p-4 bg-gradient-to-br from-purple-50 to-fuchsia-50 border-purple-200">
-                    <p class="text-xs text-purple-600 uppercase tracking-wide mb-1 font-medium">Contenu</p>
-                    <div class="flex items-end gap-2">
-                        <p class="text-3xl font-bold ${getScoreColor(avgContent)}">${avgContent}</p>
-                        <p class="text-lg text-gray-400 mb-1">/100</p>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">Qualité des textes</p>
+                <div class="card p-4">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Contenu</p>
+                    <p class="text-2xl font-bold ${getScoreClass(avgContent)}">${avgContent}<span class="text-sm font-normal text-gray-400">/100</span></p>
+                    <p class="text-xs text-gray-400 mt-1">Qualité des textes</p>
                 </div>
-                <div class="card p-4 bg-gradient-to-br from-cyan-50 to-sky-50 border-cyan-200">
-                    <p class="text-xs text-cyan-600 uppercase tracking-wide mb-1 font-medium">Attention</p>
-                    <div class="flex items-end gap-2">
-                        <p class="text-3xl font-bold ${getScoreColor(avgAttention)}">${avgAttention}</p>
-                        <p class="text-lg text-gray-400 mb-1">/100</p>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">Checks réussis</p>
+                <div class="card p-4">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Attention</p>
+                    <p class="text-2xl font-bold ${getScoreClass(avgAttention)}">${avgAttention}<span class="text-sm font-normal text-gray-400">/100</span></p>
+                    <p class="text-xs text-gray-400 mt-1">Checks réussis</p>
                 </div>
             </div>
 
-            <!-- Grille principale -->
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
-                <!-- Études IA en cours -->
-                <div class="xl:col-span-2 card p-4 md:p-6">
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <!-- Études actives -->
+                <div class="xl:col-span-2 card p-5">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="font-semibold text-gray-800 flex items-center gap-2">
-                            <span>📊</span> Études actives
-                        </h3>
-                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">${iaStudies.length}</span>
+                        <h3 class="font-semibold text-gray-800">Études actives</h3>
+                        <span class="text-xs text-gray-500">${iaStudies.length} étude(s)</span>
                     </div>
-                    ${iaStudies.length === 0 ? '<p class="text-gray-400 text-sm text-center py-8">Aucune étude IA active</p>' :
+                    ${iaStudies.length === 0 ? '<p class="text-gray-400 text-sm py-6 text-center">Aucune étude active</p>' :
                     `<div class="space-y-3">
                         ${iaStudies.map(s => {
                             const qualifies = s.qualifies || [];
-                            let studyAvgQ = 0, studyTexts = 0, studyWords = 0, studyFlags = 0;
+                            let studyAvgQ = 0, studyTexts = 0, studyFlags = 0;
                             qualifies.forEach(p => {
                                 const qd = p.qualityData || {};
                                 studyAvgQ += qd.overallQualityScore || 0;
                                 studyTexts += qd.totalTextResponses || 0;
-                                studyWords += qd.totalWords || 0;
                                 studyFlags += qd.flagsCount || 0;
                             });
                             studyAvgQ = qualifies.length > 0 ? Math.round(studyAvgQ / qualifies.length) : 0;
                             const gradeCount = { A: 0, B: 0, C: 0, D: 0, F: 0 };
                             qualifies.forEach(p => { const g = p.qualityData?.qualityGrade || 'F'; gradeCount[g]++; });
 
-                            return `<div class="p-4 bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl hover:shadow-md cursor-pointer transition border border-gray-100" onclick="switchTab('dataia', '${s.studyId}')">
+                            return `<div class="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition" onclick="switchTab('dataia', '${s.studyId}')">
                                 <div class="flex items-center gap-4">
-                                    <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow">
-                                        <span class="text-2xl">${studyAvgQ >= 80 ? '🟢' : studyAvgQ >= 60 ? '🟡' : '🔴'}</span>
-                                    </div>
+                                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-bold ${studyAvgQ >= 80 ? 'bg-green-600' : studyAvgQ >= 60 ? 'bg-amber-500' : 'bg-red-500'}">${studyAvgQ}%</div>
                                     <div class="flex-1 min-w-0">
-                                        <p class="font-semibold text-gray-800">${esc(s.studyName)}</p>
-                                        <div class="flex items-center gap-3 mt-1">
-                                            <span class="text-xs px-2 py-0.5 rounded ${studyAvgQ >= 80 ? 'bg-green-100 text-green-700' : studyAvgQ >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${studyAvgQ}% qualité</span>
-                                            <span class="text-xs text-gray-500">👥 ${qualifies.length}</span>
-                                            <span class="text-xs text-gray-500">📝 ${studyTexts} textes</span>
-                                            <span class="text-xs text-gray-500">📊 ${studyWords} mots</span>
-                                            ${studyFlags > 0 ? `<span class="text-xs text-red-500">⚠️ ${studyFlags} alertes</span>` : ''}
-                                        </div>
-                                        <div class="flex items-center gap-1 mt-2">
-                                            ${['A','B','C','D','F'].map(g => gradeCount[g] > 0 ? `<span class="text-xs px-1.5 py-0.5 rounded ${getGradeColor(g)} text-white">${g}:${gradeCount[g]}</span>` : '').join('')}
+                                        <p class="font-medium text-gray-800 truncate">${esc(s.studyName)}</p>
+                                        <div class="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                                            <span>${qualifies.length} participants</span>
+                                            <span>${studyTexts} textes</span>
+                                            ${studyFlags > 0 ? `<span class="text-red-500">${studyFlags} alertes</span>` : ''}
                                         </div>
                                     </div>
-                                    <div class="flex flex-col gap-2">
-                                        <button onclick="event.stopPropagation(); exportJSONL('${s.studyId}')" class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">JSONL</button>
-                                        <button onclick="event.stopPropagation(); exportStudy('${s.studyId}', 'qualifies')" class="px-3 py-1.5 text-xs bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">Excel</button>
+                                    <div class="flex items-center gap-1">
+                                        ${['A','B','C','D','F'].filter(g => gradeCount[g] > 0).map(g => `<span class="text-xs px-1.5 py-0.5 rounded ${getGradeBg(g)} text-white">${g}:${gradeCount[g]}</span>`).join('')}
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button onclick="event.stopPropagation(); exportJSONL('${s.studyId}')" class="px-3 py-1.5 text-xs btn-primary rounded">JSONL</button>
+                                        <button onclick="event.stopPropagation(); exportStudy('${s.studyId}', 'qualifies')" class="px-3 py-1.5 text-xs btn-secondary rounded">Excel</button>
                                     </div>
                                 </div>
                             </div>`;
@@ -668,107 +634,87 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
                     </div>`}
                 </div>
 
-                <!-- Panel de droite : Grades + Alertes -->
+                <!-- Panel latéral -->
                 <div class="space-y-4">
-                    <!-- Distribution des Grades -->
-                    <div class="card p-4 md:p-6">
-                        <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <span>🎯</span> Distribution des Grades
-                        </h3>
+                    <!-- Distribution des grades -->
+                    <div class="card p-5">
+                        <h3 class="font-semibold text-gray-800 mb-4">Distribution des grades</h3>
                         <div class="space-y-3">
                             ${['A','B','C','D','F'].map(grade => {
                                 const count = gradeDistribution[grade] || 0;
                                 const percent = participantsWithData > 0 ? Math.round(count / participantsWithData * 100) : 0;
-                                const labels = { A: 'Excellent (≥90%)', B: 'Bon (≥80%)', C: 'Correct (≥70%)', D: 'Faible (≥50%)', F: 'Rejeté (<50%)' };
+                                const labels = { A: 'Excellent', B: 'Bon', C: 'Correct', D: 'Faible', F: 'Rejeté' };
                                 return `<div class="flex items-center gap-3">
-                                    <span class="w-6 h-6 ${getGradeColor(grade)} text-white rounded flex items-center justify-center text-xs font-bold">${grade}</span>
+                                    <span class="w-6 h-6 ${getGradeBg(grade)} text-white rounded text-xs font-bold flex items-center justify-center">${grade}</span>
                                     <div class="flex-1">
                                         <div class="flex justify-between text-xs mb-1">
                                             <span class="text-gray-600">${labels[grade]}</span>
-                                            <span class="font-medium">${count}</span>
+                                            <span class="font-medium text-gray-800">${count}</span>
                                         </div>
-                                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                            <div class="h-full ${getGradeColor(grade)} rounded-full transition-all" style="width: ${percent}%"></div>
-                                        </div>
+                                        <div class="h-1.5 bg-gray-100 rounded-full"><div class="h-full ${getGradeBg(grade)} rounded-full" style="width:${percent}%"></div></div>
                                     </div>
                                 </div>`;
                             }).join('')}
                         </div>
                     </div>
 
-                    <!-- Alertes de qualité -->
-                    <div class="card p-4 md:p-6">
-                        <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <span>⚠️</span> Alertes Qualité
-                            ${totalFlags > 0 ? `<span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">${totalFlags}</span>` : ''}
-                        </h3>
+                    <!-- Alertes -->
+                    <div class="card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-gray-800">Alertes qualité</h3>
+                            ${totalFlags > 0 ? `<span class="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full">${totalFlags}</span>` : ''}
+                        </div>
                         ${Object.keys(allFlags).length === 0 ?
-                            '<p class="text-green-600 text-sm text-center py-4">✅ Aucune alerte détectée</p>' :
+                            '<p class="text-sm text-green-600 text-center py-3">Aucune alerte</p>' :
                             `<div class="space-y-2">
-                                ${Object.entries(allFlags).sort((a,b) => b[1] - a[1]).slice(0, 8).map(([flag, count]) => {
+                                ${Object.entries(allFlags).sort((a,b) => b[1] - a[1]).slice(0, 6).map(([flag, count]) => {
                                     const flagLabels = {
-                                        'SPEEDRUN_DETECTED': '⚡ Réponse trop rapide',
-                                        'EXCESSIVE_PASTE': '📋 Copier-coller excessif',
-                                        'EXCESSIVE_TAB_SWITCHES': '🔄 Changements onglets',
-                                        'ATTENTION_FAILED': '❌ Attention check échoué',
-                                        'SESSION_TOO_SHORT': '⏱️ Session trop courte',
-                                        'LOW_KEYSTROKE_RATIO': '⌨️ Peu de frappe clavier',
-                                        'DUPLICATE_RESPONSES': '🔁 Réponses dupliquées',
-                                        'MANY_SHORT_RESPONSES': '📝 Réponses courtes'
+                                        'SPEEDRUN_DETECTED': 'Réponse trop rapide',
+                                        'EXCESSIVE_PASTE': 'Copier-coller excessif',
+                                        'EXCESSIVE_TAB_SWITCHES': 'Changements onglets',
+                                        'ATTENTION_FAILED': 'Attention check échoué',
+                                        'SESSION_TOO_SHORT': 'Session trop courte',
+                                        'LOW_KEYSTROKE_RATIO': 'Peu de frappe clavier',
+                                        'DUPLICATE_RESPONSES': 'Réponses dupliquées',
+                                        'MANY_SHORT_RESPONSES': 'Réponses courtes'
                                     };
-                                    return `<div class="flex items-center justify-between p-2 bg-red-50 rounded-lg">
-                                        <span class="text-xs text-red-700">${flagLabels[flag] || flag}</span>
-                                        <span class="text-xs font-bold text-red-600">${count}</span>
+                                    return `<div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                                        <span class="text-xs text-gray-600">${flagLabels[flag] || flag}</span>
+                                        <span class="text-xs font-medium text-red-600">${count}</span>
                                     </div>`;
                                 }).join('')}
                             </div>`
                         }
                     </div>
 
-                    <!-- Stats globales -->
-                    <div class="card p-4 md:p-6 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
-                        <h3 class="font-semibold text-indigo-800 mb-3">📈 Métriques globales</h3>
+                    <!-- Stats -->
+                    <div class="card p-5">
+                        <h3 class="font-semibold text-gray-800 mb-3">Statistiques</h3>
                         <div class="grid grid-cols-2 gap-3 text-sm">
-                            <div class="bg-white/60 rounded-lg p-2 text-center">
+                            <div class="text-center p-2 bg-gray-50 rounded">
                                 <p class="text-xs text-gray-500">Total mots</p>
-                                <p class="font-bold text-indigo-700">${totalWords.toLocaleString()}</p>
+                                <p class="font-semibold text-gray-800">${totalWords.toLocaleString()}</p>
                             </div>
-                            <div class="bg-white/60 rounded-lg p-2 text-center">
-                                <p class="text-xs text-gray-500">Moy. mots/texte</p>
-                                <p class="font-bold text-indigo-700">${totalTexts > 0 ? Math.round(totalWords / totalTexts) : 0}</p>
+                            <div class="text-center p-2 bg-gray-50 rounded">
+                                <p class="text-xs text-gray-500">Moy/texte</p>
+                                <p class="font-semibold text-gray-800">${totalTexts > 0 ? Math.round(totalWords / totalTexts) : 0}</p>
                             </div>
-                            <div class="bg-white/60 rounded-lg p-2 text-center">
+                            <div class="text-center p-2 bg-gray-50 rounded">
                                 <p class="text-xs text-gray-500">Grade A+B</p>
-                                <p class="font-bold text-green-600">${gradeDistribution.A + gradeDistribution.B}</p>
+                                <p class="font-semibold text-green-600">${gradeDistribution.A + gradeDistribution.B}</p>
                             </div>
-                            <div class="bg-white/60 rounded-lg p-2 text-center">
+                            <div class="text-center p-2 bg-gray-50 rounded">
                                 <p class="text-xs text-gray-500">Grade D+F</p>
-                                <p class="font-bold text-red-600">${gradeDistribution.D + gradeDistribution.F}</p>
+                                <p class="font-semibold text-red-500">${gradeDistribution.D + gradeDistribution.F}</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Section Export -->
-            <div class="mt-6 card p-4 md:p-6 bg-gradient-to-r from-slate-50 to-gray-50">
-                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div>
-                        <h3 class="font-semibold text-gray-800 flex items-center gap-2">📥 Export des données</h3>
-                        <p class="text-sm text-gray-500 mt-1">Exportez les données filtrées par qualité pour l'entraînement</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        ${iaStudies.map(s => `<button onclick="exportJSONL('${s.studyId}')" class="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-                            📥 ${s.studyName.substring(0, 12)}${s.studyName.length > 12 ? '...' : ''}
-                        </button>`).join('')}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Archives IA -->
             ${closedIaStudies.length > 0 ? `
-            <div class="mt-6 card p-4 md:p-6">
-                <h3 class="font-semibold text-gray-800 mb-4">📁 Études terminées (${closedIaStudies.length})</h3>
+            <div class="mt-6 card p-5">
+                <h3 class="font-semibold text-gray-800 mb-4">Études terminées (${closedIaStudies.length})</h3>
                 <div class="space-y-2">
                     ${closedIaStudies.map(s => {
                         const qualifies = s.qualifies || [];
@@ -777,11 +723,11 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
                         avgQ = qualifies.length > 0 ? Math.round(avgQ / qualifies.length) : 0;
                         return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 ${avgQ >= 70 ? 'bg-green-500' : 'bg-gray-400'} rounded-lg flex items-center justify-center text-white font-bold text-xs">${avgQ}%</div>
-                                <span class="text-gray-600">${esc(s.studyName)}</span>
-                                <span class="text-xs text-gray-400">(${qualifies.length} participants)</span>
+                                <div class="w-8 h-8 rounded flex items-center justify-center text-white text-xs font-bold ${avgQ >= 70 ? 'bg-green-600' : 'bg-gray-400'}">${avgQ}%</div>
+                                <span class="text-gray-700">${esc(s.studyName)}</span>
+                                <span class="text-xs text-gray-400">(${qualifies.length})</span>
                             </div>
-                            <button onclick="exportJSONL('${s.studyId}')" class="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition">Export</button>
+                            <button onclick="exportJSONL('${s.studyId}')" class="px-3 py-1 text-xs btn-secondary rounded">Export</button>
                         </div>`;
                     }).join('')}
                 </div>
