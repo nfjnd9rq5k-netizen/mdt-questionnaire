@@ -192,6 +192,158 @@ CREATE TABLE IF NOT EXISTS `photos` (
     FOREIGN KEY (`response_id`) REFERENCES `responses`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================
+-- TABLE: panelists (utilisateurs de l'app mobile)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `panelists` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `unique_id` VARCHAR(50) NOT NULL UNIQUE COMMENT 'ID public du paneliste',
+    `email` VARCHAR(255) NOT NULL UNIQUE,
+    `password_hash` VARCHAR(255) NOT NULL,
+    `phone` VARCHAR(20) DEFAULT NULL,
+    `gender` ENUM('M', 'F', 'autre') DEFAULT NULL,
+    `birth_date` DATE DEFAULT NULL,
+    `region` VARCHAR(100) DEFAULT NULL,
+    `city` VARCHAR(100) DEFAULT NULL,
+    `postal_code` VARCHAR(10) DEFAULT NULL,
+    `csp` VARCHAR(50) DEFAULT NULL COMMENT 'Catégorie socio-professionnelle',
+    `household_size` INT UNSIGNED DEFAULT NULL,
+    `has_children` TINYINT(1) DEFAULT NULL,
+    `children_ages` JSON DEFAULT NULL COMMENT '[3, 7, 12]',
+    `equipment` JSON DEFAULT NULL COMMENT '["voiture", "iphone", "aspirateur_robot"]',
+    `brands_owned` JSON DEFAULT NULL COMMENT '["dyson", "apple", "samsung"]',
+    `interests` JSON DEFAULT NULL COMMENT '["tech", "sport", "cuisine"]',
+    `push_token` VARCHAR(255) DEFAULT NULL COMMENT 'Firebase FCM token',
+    `push_enabled` TINYINT(1) DEFAULT 1,
+    `status` ENUM('active', 'inactive', 'pending_verification', 'blacklisted') DEFAULT 'pending_verification',
+    `email_verified` TINYINT(1) DEFAULT 0,
+    `email_verification_token` VARCHAR(100) DEFAULT NULL,
+    `points_balance` INT UNSIGNED DEFAULT 0,
+    `points_lifetime` INT UNSIGNED DEFAULT 0 COMMENT 'Total points earned',
+    `studies_completed` INT UNSIGNED DEFAULT 0,
+    `last_login` DATETIME DEFAULT NULL,
+    `last_active` DATETIME DEFAULT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_email` (`email`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_region` (`region`),
+    INDEX `idx_gender` (`gender`),
+    INDEX `idx_birth_date` (`birth_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLE: panelist_sessions (sessions JWT)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `panelist_sessions` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `panelist_id` INT UNSIGNED NOT NULL,
+    `token_hash` VARCHAR(64) NOT NULL COMMENT 'Hash du refresh token',
+    `device_info` VARCHAR(255) DEFAULT NULL,
+    `ip_address` VARCHAR(45) DEFAULT NULL,
+    `expires_at` DATETIME NOT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `last_used` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_panelist_id` (`panelist_id`),
+    INDEX `idx_token_hash` (`token_hash`),
+    INDEX `idx_expires_at` (`expires_at`),
+    FOREIGN KEY (`panelist_id`) REFERENCES `panelists`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLE: solicitations (études envoyées aux panelistes)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `solicitations` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `study_id` INT UNSIGNED NOT NULL,
+    `title` VARCHAR(255) NOT NULL,
+    `description` TEXT DEFAULT NULL,
+    `study_url` VARCHAR(500) NOT NULL COMMENT 'URL for WebView',
+    `estimated_duration` VARCHAR(50) DEFAULT NULL COMMENT '10-15 min',
+    `reward_points` INT UNSIGNED DEFAULT 0,
+    `reward_description` VARCHAR(255) DEFAULT NULL COMMENT 'Ex: 50 points + tirage au sort',
+    `criteria` JSON NOT NULL COMMENT 'Targeting criteria',
+    `quota_target` INT UNSIGNED DEFAULT NULL,
+    `quota_current` INT UNSIGNED DEFAULT 0,
+    `priority` INT UNSIGNED DEFAULT 0 COMMENT 'Higher = shown first',
+    `image_url` VARCHAR(500) DEFAULT NULL COMMENT 'Image de présentation',
+    `starts_at` DATETIME DEFAULT NULL,
+    `expires_at` DATETIME DEFAULT NULL,
+    `status` ENUM('draft', 'active', 'paused', 'completed', 'cancelled') DEFAULT 'draft',
+    `created_by` INT UNSIGNED DEFAULT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_status` (`status`),
+    INDEX `idx_study_id` (`study_id`),
+    INDEX `idx_expires` (`expires_at`),
+    INDEX `idx_priority` (`priority`),
+    FOREIGN KEY (`study_id`) REFERENCES `studies`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLE: panelist_solicitations (qui reçoit quoi)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `panelist_solicitations` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `panelist_id` INT UNSIGNED NOT NULL,
+    `solicitation_id` INT UNSIGNED NOT NULL,
+    `status` ENUM('eligible', 'notified', 'viewed', 'started', 'completed', 'screened_out', 'expired') DEFAULT 'eligible',
+    `matched_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Quand le matching a été fait',
+    `notified_at` DATETIME DEFAULT NULL,
+    `viewed_at` DATETIME DEFAULT NULL,
+    `started_at` DATETIME DEFAULT NULL,
+    `completed_at` DATETIME DEFAULT NULL,
+    `response_id` INT UNSIGNED DEFAULT NULL COMMENT 'Link to responses table',
+    `points_earned` INT UNSIGNED DEFAULT 0,
+    UNIQUE KEY `idx_panelist_solicitation` (`panelist_id`, `solicitation_id`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_matched_at` (`matched_at`),
+    FOREIGN KEY (`panelist_id`) REFERENCES `panelists`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`solicitation_id`) REFERENCES `solicitations`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`response_id`) REFERENCES `responses`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLE: panelist_points_history (historique des points)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `panelist_points_history` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `panelist_id` INT UNSIGNED NOT NULL,
+    `points` INT NOT NULL COMMENT 'Positif = gagné, Négatif = dépensé',
+    `type` ENUM('study_completed', 'bonus', 'referral', 'withdrawal', 'adjustment') NOT NULL,
+    `description` VARCHAR(255) DEFAULT NULL,
+    `reference_id` INT UNSIGNED DEFAULT NULL COMMENT 'ID solicitation ou autre',
+    `balance_after` INT UNSIGNED NOT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_panelist_id` (`panelist_id`),
+    INDEX `idx_type` (`type`),
+    INDEX `idx_created_at` (`created_at`),
+    FOREIGN KEY (`panelist_id`) REFERENCES `panelists`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLE: push_notifications (historique des notifications)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `push_notifications` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `panelist_id` INT UNSIGNED NOT NULL,
+    `solicitation_id` INT UNSIGNED DEFAULT NULL,
+    `title` VARCHAR(255) NOT NULL,
+    `body` TEXT NOT NULL,
+    `data` JSON DEFAULT NULL COMMENT 'Payload additionnel',
+    `status` ENUM('pending', 'sent', 'failed', 'read') DEFAULT 'pending',
+    `sent_at` DATETIME DEFAULT NULL,
+    `read_at` DATETIME DEFAULT NULL,
+    `error_message` TEXT DEFAULT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_panelist_id` (`panelist_id`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_created_at` (`created_at`),
+    FOREIGN KEY (`panelist_id`) REFERENCES `panelists`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`solicitation_id`) REFERENCES `solicitations`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================

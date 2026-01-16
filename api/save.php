@@ -26,6 +26,60 @@ handleCorsPreflightIfNeeded();
 require_once 'db.php';
 
 // ============================================================
+// SUPPORT JWT MOBILE (optionnel)
+// ============================================================
+
+/**
+ * Vérifie si un token JWT mobile est présent et valide
+ * Retourne les infos du paneliste ou null
+ */
+function checkMobileToken(): ?array {
+    // Vérifier le header Authorization
+    $headers = getallheaders();
+    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+
+    $token = null;
+    if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
+        $token = $matches[1];
+    }
+
+    // Fallback: query parameter
+    if (!$token && isset($_GET['token'])) {
+        $token = $_GET['token'];
+    }
+
+    if (!$token) {
+        return null;
+    }
+
+    // Charger la librairie JWT si disponible
+    $jwtFile = __DIR__ . '/mobile/jwt.php';
+    if (!file_exists($jwtFile)) {
+        return null;
+    }
+
+    require_once $jwtFile;
+
+    $payload = verifyToken($token);
+    if (!$payload) {
+        return null;
+    }
+
+    // Vérifier que c'est un token valide (access ou webview)
+    $type = $payload['type'] ?? '';
+    if (!in_array($type, ['access', 'webview'])) {
+        return null;
+    }
+
+    return [
+        'panelist_id' => $payload['sub'] ?? null,
+        'panelist_unique_id' => $payload['panelist_unique_id'] ?? null,
+        'solicitation_id' => $payload['solicitation_id'] ?? null,
+        'email' => $payload['email'] ?? null
+    ];
+}
+
+// ============================================================
 // FONCTIONS UTILITAIRES
 // ============================================================
 
@@ -199,12 +253,17 @@ switch ($input['action']) {
         try {
             // Démarrer une transaction (tout réussit ou tout échoue)
             dbBeginTransaction();
-            
+
             $responseId = generateUniqueId();
             $studyId = $input['studyId'] ?? 'DEFAULT';
             $status = $input['statut'] ?? 'EN_COURS';
             $reponses = $input['reponses'] ?? [];
             $signaletique = $input['signaletique'] ?? [];
+
+            // Vérifier si c'est une réponse depuis l'app mobile
+            $mobileInfo = checkMobileToken();
+            $panelistId = $mobileInfo['panelist_id'] ?? null;
+            $solicitationId = $mobileInfo['solicitation_id'] ?? ($input['solicitation_id'] ?? null);
             
             // S'assurer que l'étude existe dans la base
             $studyInternalId = ensureStudyExists($studyId);
@@ -312,14 +371,37 @@ switch ($input['action']) {
                 );
             }
             
+            // Si c'est une réponse mobile, lier au panelist_solicitation
+            if ($panelistId && $solicitationId) {
+                try {
+                    dbExecute(
+                        "UPDATE panelist_solicitations
+                         SET response_id = ?, status = 'started', started_at = COALESCE(started_at, NOW())
+                         WHERE panelist_id = ? AND solicitation_id = ?",
+                        [$responseInternalId, $panelistId, $solicitationId]
+                    );
+                } catch (Exception $e) {
+                    // Ignorer si la table n'existe pas encore
+                    error_log("Mobile link warning: " . $e->getMessage());
+                }
+            }
+
             // Tout s'est bien passé, on valide la transaction
             dbCommit();
-            
-            echo json_encode([
+
+            $response = [
                 'success' => true,
                 'id' => $responseId,
                 'message' => 'Réponse enregistrée'
-            ]);
+            ];
+
+            // Ajouter des infos pour l'app mobile si applicable
+            if ($panelistId) {
+                $response['panelist_linked'] = true;
+                $response['solicitation_id'] = $solicitationId;
+            }
+
+            echo json_encode($response);
             
         } catch (Exception $e) {
             // En cas d'erreur, on annule tout
@@ -340,15 +422,20 @@ switch ($input['action']) {
             echo json_encode(['error' => 'ID manquant']);
             exit;
         }
-        
+
         try {
             dbBeginTransaction();
-            
+
             $uniqueId = $input['id'];
             $newStatus = $input['statut'] ?? 'EN_COURS';
             $studyId = $input['studyId'] ?? 'DEFAULT';
             $reponses = $input['reponses'] ?? [];
             $behaviorMetrics = $input['behaviorMetrics'] ?? null;
+
+            // Vérifier si c'est une mise à jour depuis l'app mobile
+            $mobileInfo = checkMobileToken();
+            $panelistId = $mobileInfo['panelist_id'] ?? null;
+            $solicitationId = $mobileInfo['solicitation_id'] ?? ($input['solicitation_id'] ?? null);
             
             // Trouver la réponse existante
             $existing = dbQueryOne(
@@ -469,19 +556,94 @@ switch ($input['action']) {
                 );
             }
             
+            // Si c'est une mise à jour mobile avec statut terminal, mettre à jour le lien
+            if ($panelistId && $solicitationId && in_array($newStatus, ['QUALIFIE', 'REFUSE'])) {
+                try {
+                    $finalStatus = ($newStatus === 'QUALIFIE') ? 'completed' : 'screened_out';
+
+                    // Récupérer les points de la solicitation si complété
+                    if ($finalStatus === 'completed') {
+                        $solInfo = dbQueryOne(
+                            "SELECT reward_points, title FROM solicitations WHERE id = ?",
+                            [$solicitationId]
+                        );
+
+                        if ($solInfo) {
+                            $pointsEarned = (int) $solInfo['reward_points'];
+
+                            // Mettre à jour panelist_solicitations
+                            dbExecute(
+                                "UPDATE panelist_solicitations
+                                 SET status = ?, completed_at = NOW(), points_earned = ?
+                                 WHERE panelist_id = ? AND solicitation_id = ?",
+                                [$finalStatus, $pointsEarned, $panelistId, $solicitationId]
+                            );
+
+                            // Ajouter les points au paneliste
+                            if ($pointsEarned > 0) {
+                                $panelist = dbQueryOne("SELECT points_balance FROM panelists WHERE id = ?", [$panelistId]);
+                                $newBalance = (int) ($panelist['points_balance'] ?? 0) + $pointsEarned;
+
+                                dbExecute(
+                                    "UPDATE panelists
+                                     SET points_balance = points_balance + ?,
+                                         points_lifetime = points_lifetime + ?,
+                                         studies_completed = studies_completed + 1,
+                                         last_active = NOW()
+                                     WHERE id = ?",
+                                    [$pointsEarned, $pointsEarned, $panelistId]
+                                );
+
+                                // Historique des points
+                                dbExecute(
+                                    "INSERT INTO panelist_points_history
+                                     (panelist_id, points, type, description, reference_id, balance_after)
+                                     VALUES (?, ?, 'study_completed', ?, ?, ?)",
+                                    [$panelistId, $pointsEarned, "Étude: " . $solInfo['title'], $solicitationId, $newBalance]
+                                );
+
+                                // Incrémenter le quota
+                                dbExecute(
+                                    "UPDATE solicitations SET quota_current = quota_current + 1 WHERE id = ?",
+                                    [$solicitationId]
+                                );
+                            }
+                        }
+                    } else {
+                        // Screened out - juste mettre à jour le statut
+                        dbExecute(
+                            "UPDATE panelist_solicitations
+                             SET status = ?, completed_at = NOW()
+                             WHERE panelist_id = ? AND solicitation_id = ?",
+                            [$finalStatus, $panelistId, $solicitationId]
+                        );
+                    }
+                } catch (Exception $e) {
+                    error_log("Mobile update link warning: " . $e->getMessage());
+                }
+            }
+
             dbCommit();
-            
-            echo json_encode(['success' => true, 'message' => 'Réponse mise à jour']);
-            
+
+            $response = ['success' => true, 'message' => 'Réponse mise à jour'];
+
+            // Ajouter des infos pour l'app mobile
+            if ($panelistId && in_array($newStatus, ['QUALIFIE', 'REFUSE'])) {
+                $response['study_completed'] = ($newStatus === 'QUALIFIE');
+                $response['points_earned'] = $pointsEarned ?? 0;
+            }
+
+            echo json_encode($response);
+
         } catch (Exception $e) {
             dbRollback();
-            
+
             error_log("Erreur update: " . $e->getMessage());
             http_response_code(500);
             echo json_encode(['error' => 'Erreur de mise à jour: ' . $e->getMessage()]);
         }
         break;
-    
+
     // ----------------------------------------------------------
     // ACTION INCONNUE
     // ----------------------------------------------------------
