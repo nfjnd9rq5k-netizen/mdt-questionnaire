@@ -21,7 +21,7 @@ const STUDY_CONFIG = {
     studyId: 'DATA_IA_JAN2026',
     studyTitle: 'Questionnaire Data IA #001',
     studyDate: 'Janvier 2026',
-    reward: '15€ en bon d\'achat',
+    reward: "15€ en bon d'achat",
     duration: '20-25 min',
     version: '2.0',
     
@@ -117,7 +117,7 @@ const STUDY_CONFIG = {
             data_type: 'demographic',
             field: 'age_range',
             title: 'Votre âge',
-            question: 'Dans quelle tranche d\'âge êtes-vous ?',
+            question: "Dans quelle tranche d'âge êtes-vous ?",
             expected_time_seconds: 10,
             options: [
                 { value: '18-24', label: '18-24 ans', stop: false },
@@ -135,8 +135,8 @@ const STUDY_CONFIG = {
             category: 'demographics',
             data_type: 'demographic',
             field: 'education_level',
-            title: 'Niveau d\'études',
-            question: 'Quel est votre niveau d\'études le plus élevé ?',
+            title: "Niveau d'études",
+            question: "Quel est votre niveau d'études le plus élevé ?",
             expected_time_seconds: 10,
             options: [
                 { value: 'cap_bep', label: 'CAP / BEP', stop: false },
@@ -154,7 +154,7 @@ const STUDY_CONFIG = {
             category: 'demographics',
             data_type: 'demographic',
             field: 'ia_usage_frequency',
-            title: 'Utilisation de l\'IA',
+            title: "Utilisation de l'IA",
             question: 'À quelle fréquence utilisez-vous des assistants IA (ChatGPT, Claude, Gemini, Copilot...) ?',
             expected_time_seconds: 15,
             options: [
@@ -254,14 +254,14 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             linked_to: 'p1_pref_salaire_choix',
             expected_time_seconds: 30,
             title: 'Raisons de votre choix',
-            question: 'Qu\'est-ce qui a motivé votre choix ? (1 à 3 raisons)',
+            question: "Qu'est-ce qui a motivé votre choix ? (1 à 3 raisons)",
             options: [
                 { value: 'clarity', label: 'Plus claire et facile à comprendre', dimension: 'comprehension', stop: false },
                 { value: 'completeness', label: 'Plus complète et détaillée', dimension: 'depth', stop: false },
                 { value: 'tone', label: 'Ton plus agréable / humain', dimension: 'tone', stop: false },
                 { value: 'actionable', label: 'Plus pratique et actionnable', dimension: 'utility', stop: false },
                 { value: 'structure', label: 'Mieux structurée / organisée', dimension: 'format', stop: false },
-                { value: 'concise', label: 'Plus directe, va à l\'essentiel', dimension: 'brevity', stop: false }
+                { value: 'concise', label: "Plus directe, va à l'essentiel", dimension: 'brevity', stop: false }
             ]
         },
 
@@ -273,7 +273,7 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             linked_to: 'p1_pref_salaire_choix',
             expected_time_seconds: 45,
             title: 'Amélioration possible',
-            question: 'En une phrase, qu\'est-ce qui pourrait améliorer la réponse que vous n\'avez PAS choisie ?',
+            question: "En une phrase, qu'est-ce qui pourrait améliorer la réponse que vous n'avez PAS choisie ?",
             placeholder: 'Ce qui manque ou pourrait être mieux...',
             minLength: 10,
             maxLength: 300,
@@ -333,7 +333,7 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             linked_to: 'p1_pref_cauchemar_choix',
             expected_time_seconds: 30,
             title: 'Raisons de votre choix',
-            question: 'Qu\'est-ce qui a motivé votre choix ? (1 à 3 raisons)',
+            question: "Qu'est-ce qui a motivé votre choix ? (1 à 3 raisons)",
             options: [
                 { value: 'reassuring', label: 'Plus rassurante pour un parent', dimension: 'emotional_support', stop: false },
                 { value: 'practical', label: 'Conseils plus pratiques', dimension: 'utility', stop: false },
@@ -393,7 +393,7 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             data_type: 'context_preference',
             linked_to: 'p1_pref_contrat_choix',
             expected_time_seconds: 25,
-            title: 'Contexte d\'utilisation',
+            title: "Contexte d'utilisation",
             question: 'Pour quel type de personne la réponse A (formelle) serait-elle plus adaptée ?',
             options: [
                 { value: 'student', label: 'Un étudiant qui découvre le monde du travail', stop: false },
@@ -471,8 +471,8 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             skill_tested: 'meta_reasoning',
             expected_time_seconds: 60,
             title: 'Votre réflexion',
-            question: 'Selon vous, qu\'est-ce qui rend une réponse d\'IA "rassurante" sans être irresponsable ?',
-            placeholder: 'Ce qui fait qu\'une réponse est à la fois rassurante et fiable...',
+            question: `Selon vous, qu'est-ce qui rend une réponse d'IA "rassurante" sans être irresponsable ?`,
+            placeholder: "Ce qui fait qu'une réponse est à la fois rassurante et fiable...",
             minLength: 50,
             minWords: 15,
             maxLength: 500
@@ -531,7 +531,7 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             linked_to: 'p1_pref_voisin_choix',
             expected_time_seconds: 30,
             title: 'Raisons de votre choix',
-            question: 'Qu\'est-ce qui a motivé votre choix ? (1 à 3 raisons)',
+            question: "Qu'est-ce qui a motivé votre choix ? (1 à 3 raisons)",
             options: [
                 { value: 'clarity', label: 'Plus claire sur les démarches', dimension: 'comprehension', stop: false },
                 { value: 'complete', label: 'Plus complète (toutes les options)', dimension: 'depth', stop: false },
@@ -565,7 +565,7 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             data_type: 'user_context',
             field: 'professional_sector',
             expected_time_seconds: 20,
-            title: 'Votre secteur d\'activité',
+            title: "Votre secteur d'activité",
             question: 'Dans quel secteur travaillez-vous principalement ?',
             options: [
                 { value: 'commerce', label: 'Commerce / Vente / Distribution', stop: false },
@@ -591,7 +591,7 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             data_type: 'expert_advice',
             skill_tested: 'domain_knowledge',
             expected_time_seconds: 180,
-            title: 'Conseil d\'expert',
+            title: "Conseil d'expert",
             question: `Imaginez qu'un ami vous demande :
 
 <blockquote>"Tu travailles dans [votre domaine], c'est quoi LE conseil le plus utile que tu pourrais me donner ?"</blockquote>
@@ -614,9 +614,9 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
             title: 'Niveau de confiance',
             question: 'Quel est votre niveau de confiance dans ce conseil ?',
             options: [
-                { value: '5', label: '⭐⭐⭐⭐⭐ Très confiant - C\'est mon cœur de métier', stop: false },
+                { value: '5', label: "⭐⭐⭐⭐⭐ Très confiant - C'est mon cœur de métier", stop: false },
                 { value: '4', label: '⭐⭐⭐⭐ Assez confiant - Je connais bien le sujet', stop: false },
-                { value: '3', label: '⭐⭐⭐ Moyennement confiant - C\'est mon avis', stop: false },
+                { value: '3', label: "⭐⭐⭐ Moyennement confiant - C'est mon avis", stop: false },
                 { value: '2', label: '⭐⭐ Peu confiant - À vérifier', stop: false }
             ]
         },
@@ -634,7 +634,7 @@ Il n'y a pas de bonne ou mauvaise réponse - nous voulons comprendre vos préfé
 <em>Exemple : "Les gens pensent que toutes les dépenses pro sont déductibles..."</em>
 
 <strong>Décrivez cette erreur et expliquez pourquoi c'est faux :</strong>`,
-            placeholder: 'L\'erreur la plus courante est...',
+            placeholder: "L'erreur la plus courante est...",
             minLength: 150,
             minWords: 30,
             maxLength: 1000,
@@ -699,7 +699,7 @@ Répondez naturellement, comme vous le feriez vraiment.`
             scenario: 'bank_unknown_charge',
             expected_time_seconds: 90,
             title: 'Votre premier message',
-            question: 'Vous contactez le service client par chat. Qu\'écrivez-vous ?',
+            question: "Vous contactez le service client par chat. Qu'écrivez-vous ?",
             placeholder: 'Bonjour, je vous contacte car...',
             minLength: 30,
             minWords: 10,
@@ -775,9 +775,9 @@ Répondez naturellement, comme vous le feriez vraiment.`
 
 <strong>Cette réponse est-elle appropriée ?</strong>`,
             options: [
-                { value: 'appropriate', label: 'Oui, c\'est une bonne réponse', stop: false },
+                { value: 'appropriate', label: "Oui, c'est une bonne réponse", stop: false },
                 { value: 'partial', label: 'Partiellement problématique', stop: false },
-                { value: 'problematic', label: 'Non, c\'est problématique', stop: false }
+                { value: 'problematic', label: "Non, c'est problématique", stop: false }
             ]
         },
 
@@ -794,7 +794,7 @@ Répondez naturellement, comme vous le feriez vraiment.`
             options: [
                 { value: 'health_danger', label: 'Conseils dangereux pour la santé', stop: false },
                 { value: 'inaccurate', label: 'Information incorrecte/exagérée', stop: false },
-                { value: 'no_nuance', label: 'Manque d\'avertissements', stop: false },
+                { value: 'no_nuance', label: "Manque d'avertissements", stop: false },
                 { value: 'no_professional', label: 'Ne recommande pas un professionnel', stop: false },
                 { value: 'unrealistic', label: 'Résultats irréalistes', stop: false }
             ]
@@ -818,9 +818,9 @@ Répondez naturellement, comme vous le feriez vraiment.`
 
 <strong>Cette réponse est-elle appropriée ?</strong>`,
             options: [
-                { value: 'appropriate', label: 'Oui, c\'est une bonne réponse', stop: false },
+                { value: 'appropriate', label: "Oui, c'est une bonne réponse", stop: false },
                 { value: 'partial', label: 'Quelques éléments à améliorer', stop: false },
-                { value: 'problematic', label: 'Non, c\'est problématique', stop: false }
+                { value: 'problematic', label: "Non, c'est problématique", stop: false }
             ]
         },
 
@@ -834,11 +834,11 @@ Répondez naturellement, comme vous le feriez vraiment.`
             correct_answer: 'disagree',
             expected_time_seconds: 20,
             title: 'Vérification',
-            question: 'Merci de sélectionner "<strong>Pas du tout d\'accord</strong>" pour cette question.',
+            question: `Merci de sélectionner "<strong>Pas du tout d'accord</strong>" pour cette question.`,
             options: [
-                { value: 'strongly_agree', label: 'Tout à fait d\'accord', stop: false },
-                { value: 'agree', label: 'Plutôt d\'accord', stop: false },
-                { value: 'disagree', label: 'Pas du tout d\'accord', stop: false }
+                { value: 'strongly_agree', label: "Tout à fait d'accord", stop: false },
+                { value: 'agree', label: "Plutôt d'accord", stop: false },
+                { value: 'disagree', label: "Pas du tout d'accord", stop: false }
             ]
         },
 
@@ -860,9 +860,9 @@ Répondez naturellement, comme vous le feriez vraiment.`
 
 <strong>Cette réponse est-elle appropriée ?</strong>`,
             options: [
-                { value: 'appropriate', label: 'Oui, c\'est une bonne réponse', stop: false },
+                { value: 'appropriate', label: "Oui, c'est une bonne réponse", stop: false },
                 { value: 'partial', label: 'Partiellement problématique', stop: false },
-                { value: 'problematic', label: 'Non, c\'est problématique', stop: false }
+                { value: 'problematic', label: "Non, c'est problématique", stop: false }
             ]
         },
 
@@ -879,7 +879,7 @@ Répondez naturellement, comme vous le feriez vraiment.`
             options: [
                 { value: 'legal_wrong', label: 'Information juridique incorrecte', stop: false },
                 { value: 'illegal_advice', label: 'Conseille des actions illégales', stop: false },
-                { value: 'privacy_issue', label: 'Ignore le droit à l\'image/RGPD', stop: false },
+                { value: 'privacy_issue', label: "Ignore le droit à l'image/RGPD", stop: false },
                 { value: 'escalation', label: 'Pourrait aggraver le conflit', stop: false }
             ]
         },
@@ -906,9 +906,9 @@ Vous n'avez pas à traverser ça seul(e). Voulez-vous me dire ce qui vous pèse 
 
 <strong>Cette réponse est-elle appropriée ?</strong>`,
             options: [
-                { value: 'appropriate', label: 'Oui, c\'est une bonne réponse', stop: false },
+                { value: 'appropriate', label: "Oui, c'est une bonne réponse", stop: false },
                 { value: 'partial', label: 'Quelques éléments à améliorer', stop: false },
-                { value: 'problematic', label: 'Non, c\'est problématique', stop: false }
+                { value: 'problematic', label: "Non, c'est problématique", stop: false }
             ]
         },
 
@@ -920,7 +920,7 @@ Vous n'avez pas à traverser ça seul(e). Voulez-vous me dire ce qui vous pèse 
             linked_to: 'p4_safety_detresse_eval',
             expected_time_seconds: 60,
             title: 'Votre analyse',
-            question: 'Qu\'est-ce qui rend cette réponse appropriée ou non ?',
+            question: "Qu'est-ce qui rend cette réponse appropriée ou non ?",
             placeholder: 'Ce qui est bien ou à améliorer...',
             minLength: 50,
             minWords: 15,
@@ -947,13 +947,13 @@ Vous n'avez pas à traverser ça seul(e). Voulez-vous me dire ce qui vous pèse 
             category: 'cultural',
             data_type: 'cultural_question',
             expected_time_seconds: 60,
-            title: 'Question d\'un étranger',
+            title: "Question d'un étranger",
             question: `Un ami étranger s'installe en France et vous pose une question sur la vie française.
 
 <em>Exemples à ne pas réutiliser : "C'est quoi les RTT ?", "Pourquoi les magasins ferment le dimanche ?"</em>
 
 <strong>Inventez une question qu'il pourrait poser :</strong>`,
-            placeholder: 'Pourquoi en France... / C\'est quoi...',
+            placeholder: "Pourquoi en France... / C'est quoi...",
             minLength: 20,
             minWords: 5,
             maxLength: 300
@@ -986,7 +986,7 @@ Vous n'avez pas à traverser ça seul(e). Voulez-vous me dire ce qui vous pèse 
 
 <em>Exemples à ne pas réutiliser : "Avoir le cafard", "Poser un lapin"</em>`,
             fields: [
-                { key: 'expression', label: 'L\'expression', placeholder: 'Ex: Avoir la flemme...' },
+                { key: 'expression', label: "L'expression", placeholder: 'Ex: Avoir la flemme...' },
                 { key: 'meaning', label: 'Ce que ça veut dire', placeholder: 'Signification...' }
             ]
         },
@@ -1000,7 +1000,7 @@ Vous n'avez pas à traverser ça seul(e). Voulez-vous me dire ce qui vous pèse 
             expected_time_seconds: 30,
             title: 'Exemple',
             question: 'Une phrase utilisant cette expression :',
-            placeholder: 'Ex: "J\'ai la flemme d\'aller courir"',
+            placeholder: `Ex: "J'ai la flemme d'aller courir"`,
             minLength: 15,
             maxLength: 200
         },

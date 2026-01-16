@@ -86,10 +86,10 @@ const STUDY_CONFIG = {
     questions: [
         {
             id: 'q1',
-            title: 'Secteurs d\'activité',
-            question: 'Vous-même ou quelqu\'un de votre entourage proche travaillez-vous dans l\'un des secteurs suivants ?',
+            title: "Secteurs d'activité",
+            question: "Vous-même ou quelqu'un de votre entourage proche travaillez-vous dans l'un des secteurs suivants ?",
             type: 'multiple',
-            note: 'AUCUN NE TRAVAILLE DANS L\'UN DES SECTEURS CI-DESSUS SINON STOP',
+            note: "AUCUN NE TRAVAILLE DANS L'UN DES SECTEURS CI-DESSUS SINON STOP",
             options: [
                 { value: 'publicite', label: 'Publicité', stop: true },
                 { value: 'relations_publiques', label: 'Relations publiques', stop: true },
@@ -119,7 +119,7 @@ const STUDY_CONFIG = {
             title: 'Études aspirateurs',
             question: 'Avez-vous déjà participé à un entretien ou une étude portant sur les aspirateurs au cours des 12 derniers mois ?',
             type: 'single',
-            note: 'Aucun n\'a déjà participé à ce type d\'études',
+            note: "Aucun n'a déjà participé à ce type d'études",
             options: [
                 { value: 'oui', label: 'Oui', stop: true },
                 { value: 'non', label: 'Non', stop: false }
@@ -131,7 +131,7 @@ const STUDY_CONFIG = {
             title: 'Sexe',
             question: 'Vous êtes :',
             type: 'single',
-            note: 'Pas de quotas – essayer d\'avoir 2 hommes',
+            note: "Pas de quotas – essayer d'avoir 2 hommes",
             options: [
                 { value: 'homme', label: 'Un homme', stop: false },
                 { value: 'femme', label: 'Une femme', stop: false },
@@ -165,7 +165,7 @@ const STUDY_CONFIG = {
             note: 'VOIR QUOTAS ENFANTS/ANIMAUX',
             options: [
                 { value: 'oui_moins_18', label: 'Oui', stop: false, needsText: true, textLabel: 'Préciser les âges' },
-                { value: 'oui_plus_ages', label: 'Non, j\'ai des enfants plus âgés', stop: false, needsText: true, textLabel: 'Préciser les âges' },
+                { value: 'oui_plus_ages', label: "Non, j'ai des enfants plus âgés", stop: false, needsText: true, textLabel: 'Préciser les âges' },
                 { value: 'partis', label: 'Non, les enfants sont partis du foyer', stop: false },
                 { value: 'aucun', label: 'Non, aucun enfant', stop: false }
             ]
@@ -178,9 +178,9 @@ const STUDY_CONFIG = {
             type: 'multiple_with_text',
             note: 'VOIR QUOTAS ENFANTS/ANIMAUX',
             options: [
-                { value: 'chats', label: 'Oui, j\'ai un ou plusieurs chats', stop: false, needsText: true, textLabel: 'Combien ?' },
-                { value: 'chiens', label: 'Oui, j\'ai un ou plusieurs chiens', stop: false, needsText: true, textLabel: 'Combien ?' },
-                { value: 'aucun', label: 'Non, je n\'ai ni chien ni chat', stop: false, exclusive: true }
+                { value: 'chats', label: "Oui, j'ai un ou plusieurs chats", stop: false, needsText: true, textLabel: 'Combien ?' },
+                { value: 'chiens', label: "Oui, j'ai un ou plusieurs chiens", stop: false, needsText: true, textLabel: 'Combien ?' },
+                { value: 'aucun', label: "Non, je n'ai ni chien ni chat", stop: false, exclusive: true }
             ]
         },
 
@@ -189,10 +189,10 @@ const STUDY_CONFIG = {
             title: 'Rôle décisionnel',
             question: 'Quel est votre rôle dans le choix des appareils ménagers (aspirateurs, balais, nettoyeurs...) pour votre foyer ?',
             type: 'single',
-            note: 'Tous au moins conjointement responsable du choix et de l\'achat',
+            note: "Tous au moins conjointement responsable du choix et de l'achat",
             options: [
                 { value: 'principal', label: 'Je suis le/la principal(e) décisionnaire pour ces achats', stop: false },
-                { value: 'influence', label: 'J\'ai une certaine influence, mais c\'est quelqu\'un d\'autre qui décide', stop: false },
+                { value: 'influence', label: "J'ai une certaine influence, mais c'est quelqu'un d'autre qui décide", stop: false },
                 { value: 'non_participe', label: 'Je ne participe généralement pas à ces décisions', stop: true }
             ]
         },
@@ -200,13 +200,13 @@ const STUDY_CONFIG = {
         {
             id: 'q9',
             title: 'Utilisation appareils',
-            question: 'Quelle affirmation décrit le mieux l\'utilisation des appareils de nettoyage des sols dans votre foyer ?',
+            question: "Quelle affirmation décrit le mieux l'utilisation des appareils de nettoyage des sols dans votre foyer ?",
             type: 'single',
             note: 'Tous au moins conjointement responsable sinon STOP',
             options: [
-                { value: 'principal', label: 'Je suis l\'utilisateur principal des appareils de nettoyage des sols', stop: false },
+                { value: 'principal', label: "Je suis l'utilisateur principal des appareils de nettoyage des sols", stop: false },
                 { value: 'partage', label: 'Je partage cette tâche à part égale avec une autre personne', stop: false },
-                { value: 'non_utilise', label: 'Je n\'utilise pas les appareils de nettoyage des sols', stop: true }
+                { value: 'non_utilise', label: "Je n'utilise pas les appareils de nettoyage des sols", stop: true }
             ]
         },
 
@@ -229,28 +229,28 @@ const STUDY_CONFIG = {
                 { value: 'balai_pulverisateur', label: 'Balai avec pulvérisateur et serpillère microfibre', stop: false },
                 { value: 'robot_lavant', label: 'Aspirateur robot lavant', stop: false },
                 { value: 'autre', label: 'Autre', stop: false, needsText: true, textLabel: 'Préciser' },
-                { value: 'rien', label: 'Je n\'utilise rien pour nettoyer mes sols durs', stop: true, exclusive: true }
+                { value: 'rien', label: "Je n'utilise rien pour nettoyer mes sols durs", stop: true, exclusive: true }
             ]
         },
 
         {
             id: 'q11',
-            title: 'Intention d\'achat',
-            question: 'Concernant l\'aspirateur balai 2 en 1 pour sols durs (humides/secs), quelle est votre situation ?',
+            title: "Intention d'achat",
+            question: "Concernant l'aspirateur balai 2 en 1 pour sols durs (humides/secs), quelle est votre situation ?",
             type: 'single',
             note: 'QUOTAS: 2 possesseurs envisageant de changer | 3 non possesseurs intéressés',
             options: [
                 { value: 'possede_remplacer', label: 'Je possède ce produit ET je souhaite ou envisage de le remplacer', stop: false },
                 { value: 'possede_garder', label: 'Je possède ce produit et je ne souhaite PAS le remplacer', stop: true },
-                { value: 'pas_possede_interesse', label: 'Je ne possède pas ce produit, mais je pense qu\'il serait utile chez moi', stop: false },
-                { value: 'pas_interesse', label: 'Je ne possède pas ce produit et il ne m\'intéresse pas', stop: true }
+                { value: 'pas_possede_interesse', label: "Je ne possède pas ce produit, mais je pense qu'il serait utile chez moi", stop: false },
+                { value: 'pas_interesse', label: "Je ne possède pas ce produit et il ne m'intéresse pas", stop: true }
             ]
         },
 
         {
             id: 'q12',
             title: 'Intérêt produit',
-            question: 'En ce qui concerne ce type de produit, quel serait votre intérêt pour l\'acheter si son prix était à 449€ ?',
+            question: "En ce qui concerne ce type de produit, quel serait votre intérêt pour l'acheter si son prix était à 449€ ?",
             type: 'single',
             note: 'TERMINER si neutre ou pas intéressé',
             options: [
@@ -324,7 +324,7 @@ const STUDY_CONFIG = {
         {
             id: 'q17',
             title: 'Marques',
-            question: 'Parmi ces marques, y en a-t-il une que vous n\'achèteriez en aucun cas ?',
+            question: "Parmi ces marques, y en a-t-il une que vous n'achèteriez en aucun cas ?",
             type: 'multiple',
             note: '⚠️ STOP SI SHARK CITÉ',
             options: [
@@ -341,11 +341,11 @@ const STUDY_CONFIG = {
         {
             id: 'q18',
             title: 'Profession',
-            question: 'Quelle est votre profession et dans quel secteur d\'activités ?',
+            question: "Quelle est votre profession et dans quel secteur d'activités ?",
             type: 'double_text',
             fields: [
                 { key: 'profession', label: 'Profession' },
-                { key: 'secteur', label: 'Secteur d\'activités' }
+                { key: 'secteur', label: "Secteur d'activités" }
             ]
         },
 
@@ -356,8 +356,8 @@ const STUDY_CONFIG = {
             type: 'single',
             note: 'STOP si pas de diplôme ou CAP/BEP',
             options: [
-                { value: 'aucun', label: 'Je n\'ai pas de diplôme', stop: true },
-                { value: 'cap_bep', label: 'CAP – BEP – Brevet – Certificat d\'études', stop: true },
+                { value: 'aucun', label: "Je n'ai pas de diplôme", stop: true },
+                { value: 'cap_bep', label: "CAP – BEP – Brevet – Certificat d'études", stop: true },
                 { value: 'bac', label: 'Baccalauréat', stop: false },
                 { value: 'bac2', label: 'Bac +2 (BTS/DUT/DEUST)', stop: false },
                 { value: 'bac34', label: 'Bac +3/+4', stop: false },
@@ -369,19 +369,19 @@ const STUDY_CONFIG = {
         {
             id: 'q20',
             title: 'Profession partenaire',
-            question: 'Quelle est la profession de votre partenaire et dans quel secteur d\'activités ?',
+            question: "Quelle est la profession de votre partenaire et dans quel secteur d'activités ?",
             type: 'double_text',
             optional: true,
             fields: [
                 { key: 'profession_partenaire', label: 'Profession' },
-                { key: 'secteur_partenaire', label: 'Secteur d\'activités' }
+                { key: 'secteur_partenaire', label: "Secteur d'activités" }
             ]
         },
 
         {
             id: 'q21',
             title: 'Revenus annuels',
-            question: 'Quelle tranche de revenus annuels s\'applique à votre foyer (tous revenus confondus) ?',
+            question: "Quelle tranche de revenus annuels s'applique à votre foyer (tous revenus confondus) ?",
             type: 'single',
             note: 'STOP si moins de 50 000€',
             options: [

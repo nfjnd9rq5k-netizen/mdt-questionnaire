@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- SCHEMA COMPLET - La Maison du Test
 -- ============================================================
 -- Exécuter ce fichier dans phpMyAdmin pour créer toutes les tables
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS `admin_logs` (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `login_attempts` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `ip_hash` VARCHAR(64) NOT NULL COMMENT 'Hash de l\'IP pour anonymisation',
+    `ip_hash` VARCHAR(64) NOT NULL COMMENT 'Hash de l''IP pour anonymisation',
     `username` VARCHAR(100) DEFAULT NULL,
     `attempts` INT UNSIGNED DEFAULT 1,
     `first_attempt` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `responses` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `unique_id` VARCHAR(50) NOT NULL UNIQUE COMMENT 'ID public du participant',
     `study_id` INT UNSIGNED NOT NULL,
-    `access_id` VARCHAR(100) DEFAULT NULL COMMENT 'Code d\'accès utilisé',
+    `access_id` VARCHAR(100) DEFAULT NULL COMMENT 'Code d''accès utilisé',
     `status` ENUM('EN_COURS', 'QUALIFIE', 'REFUSE') DEFAULT 'EN_COURS',
     `stop_reason` TEXT DEFAULT NULL,
     `all_stop_reasons` JSON DEFAULT NULL,

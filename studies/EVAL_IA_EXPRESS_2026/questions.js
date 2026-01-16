@@ -36,7 +36,7 @@
 
 const STUDY_CONFIG = {
     studyId: 'EVAL_IA_EXPRESS_2026',
-    studyTitle: 'Évaluez des réponses d\'IA (12-15 min)',
+    studyTitle: "Évaluez des réponses d'IA (12-15 min)",
     studyDate: 'Janvier 2026',
     status: 'active',
 
@@ -112,7 +112,7 @@ const STUDY_CONFIG = {
         {
             id: 'p0_age',
             type: 'radio',
-            title: 'Votre tranche d\'âge ?',
+            title: "Votre tranche d'âge ?",
             required: true,
             options: [
                 { value: '18-24', label: '18-24 ans' },
@@ -126,7 +126,7 @@ const STUDY_CONFIG = {
         {
             id: 'p0_education',
             type: 'radio',
-            title: 'Votre niveau d\'études ?',
+            title: "Votre niveau d'études ?",
             required: true,
             options: [
                 { value: 'bac_moins', label: 'Sans diplôme / Bac ou moins' },
@@ -168,7 +168,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_1',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Explique-moi ce qu\'est le réchauffement climatique"',
+            title: `📝 Question posée à l'IA : "Explique-moi ce qu'est le réchauffement climatique"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -218,7 +218,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_2',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Comment faire pour mieux dormir ?"',
+            title: `📝 Question posée à l'IA : "Comment faire pour mieux dormir ?"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -268,7 +268,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_3',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "J\'ai raté mon examen, je suis déprimé"',
+            title: `📝 Question posée à l'IA : "J'ai raté mon examen, je suis déprimé"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -318,7 +318,7 @@ const STUDY_CONFIG = {
         {
             id: 'attention_1',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Quelle est la capitale de la France ?"',
+            title: `📝 Question posée à l'IA : "Quelle est la capitale de la France ?"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -346,7 +346,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_4',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Écris le début d\'une histoire de science-fiction"',
+            title: `📝 Question posée à l'IA : "Écris le début d'une histoire de science-fiction"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -396,7 +396,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_5',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Comment centrer un élément en CSS ?"',
+            title: `📝 Question posée à l'IA : "Comment centrer un élément en CSS ?"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -449,7 +449,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_6',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Raconte-moi une blague"',
+            title: `📝 Question posée à l'IA : "Raconte-moi une blague"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -502,7 +502,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_7',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Résume-moi les avantages du télétravail"',
+            title: `📝 Question posée à l'IA : "Résume-moi les avantages du télétravail"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -552,7 +552,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_8',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Convaincs-moi de faire du sport régulièrement"',
+            title: `📝 Question posée à l'IA : "Convaincs-moi de faire du sport régulièrement"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -602,7 +602,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_9',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Comment changer un pneu de voiture ?"',
+            title: `📝 Question posée à l'IA : "Comment changer un pneu de voiture ?"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -658,7 +658,7 @@ const STUDY_CONFIG = {
         {
             id: 'pref_10',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Qui a inventé l\'ampoule électrique ?"',
+            title: `📝 Question posée à l'IA : "Qui a inventé l'ampoule électrique ?"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -712,7 +712,7 @@ const STUDY_CONFIG = {
         {
             id: 'gold_1',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Comment calculer 15% de 200 ?"',
+            title: `📝 Question posée à l'IA : "Comment calculer 15% de 200 ?"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -736,7 +736,7 @@ const STUDY_CONFIG = {
         {
             id: 'gold_2',
             type: 'radio',
-            title: '📝 Question posée à l\'IA : "Donne-moi une recette simple de pâtes"',
+            title: `📝 Question posée à l'IA : "Donne-moi une recette simple de pâtes"`,
             text: `
                 <div style="display: grid; gap: 16px; margin: 16px 0;">
                     <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -852,8 +852,8 @@ const STUDY_CONFIG = {
         {
             id: 'rating_3_comment',
             type: 'textarea',
-            title: 'Qu\'est-ce qui manque ou pourrait être amélioré ?',
-            placeholder: 'Il faudrait ajouter... / C\'est bien mais...',
+            title: "Qu'est-ce qui manque ou pourrait être amélioré ?",
+            placeholder: "Il faudrait ajouter... / C'est bien mais...",
             required: false,
             maxLength: 300,
             metadata: { type: 'quality_feedback', parent: 'rating_3' }
@@ -953,7 +953,7 @@ const STUDY_CONFIG = {
             options: [
                 { value: 'trop_formel', label: 'Trop formel / guindé' },
                 { value: 'trop_vague', label: 'Trop vague / peu utile' },
-                { value: 'manque_exemples', label: 'Manque d\'exemples concrets' },
+                { value: 'manque_exemples', label: "Manque d'exemples concrets" },
                 { value: 'trop_generique', label: 'Trop générique / banal' },
                 { value: 'incomplet', label: 'Réponse incomplète' },
                 { value: 'autre', label: 'Autre problème' }
@@ -1013,7 +1013,7 @@ const STUDY_CONFIG = {
             required: true,
             minRequired: 1,
             options: [
-                { value: 'manque_empathie', label: 'Manque d\'empathie / trop froid' },
+                { value: 'manque_empathie', label: "Manque d'empathie / trop froid" },
                 { value: 'trop_prescriptif', label: 'Trop prescriptif / liste de conseils inappropriée' },
                 { value: 'insensible', label: 'Insensible au contexte émotionnel' },
                 { value: 'trop_rapide', label: 'Passe trop vite aux solutions' },
@@ -1025,7 +1025,7 @@ const STUDY_CONFIG = {
         {
             id: 'correct_3',
             type: 'textarea',
-            title: '✏️ Réécrivez avec plus d\'empathie.',
+            title: "✏️ Réécrivez avec plus d'empathie.",
             placeholder: 'Je suis vraiment désolé...',
             required: true,
             minLength: 40,
@@ -1203,7 +1203,7 @@ const STUDY_CONFIG = {
             id: 'feedback_commentaire',
             type: 'textarea',
             title: 'Un commentaire ? (optionnel)',
-            placeholder: 'Ce que j\'ai aimé / pas aimé...',
+            placeholder: "Ce que j'ai aimé / pas aimé...",
             required: false,
             maxLength: 500,
             metadata: { type: 'feedback' }
@@ -1211,11 +1211,11 @@ const STUDY_CONFIG = {
         {
             id: 'feedback_recontact',
             type: 'radio',
-            title: 'Accepteriez-vous de participer à d\'autres questionnaires ?',
+            title: "Accepteriez-vous de participer à d'autres questionnaires ?",
             required: true,
             options: [
                 { value: 'oui', label: 'Oui, avec plaisir' },
-                { value: 'si_remunere', label: 'Oui, si c\'est rémunéré' },
+                { value: 'si_remunere', label: "Oui, si c'est rémunéré" },
                 { value: 'non', label: 'Non merci' }
             ],
             metadata: { type: 'feedback' }

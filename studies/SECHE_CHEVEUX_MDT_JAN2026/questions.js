@@ -172,7 +172,7 @@ const STUDY_CONFIG = {
             
             {
                 id: 'age',
-                titre: '🎂 Tranche d\'âge',
+                titre: "🎂 Tranche d'âge",
                 source: 'q4',
                 type: 'tranche',
                 criteres: [
@@ -187,8 +187,8 @@ const STUDY_CONFIG = {
                 titre: '📏 Longueur des cheveux',
                 source: 'q14',
                 criteres: [
-                    { valeur: 'epaules', label: 'Jusqu\'aux épaules', objectif: null },
-                    { valeur: 'aisselles', label: 'Jusqu\'aux aisselles', objectif: null },
+                    { valeur: 'epaules', label: "Jusqu'aux épaules", objectif: null },
+                    { valeur: 'aisselles', label: "Jusqu'aux aisselles", objectif: null },
                     { valeur: 'apres_aisselles', label: 'Après les aisselles', objectif: null }
                 ]
             },
@@ -212,15 +212,15 @@ const STUDY_CONFIG = {
         
         {
             id: 'q1',
-            title: 'Secteurs d\'activité',
-            question: 'Vous-même ou quelqu\'un de votre entourage proche travaillez-vous dans l\'un des secteurs suivants ?',
+            title: "Secteurs d'activité",
+            question: "Vous-même ou quelqu'un de votre entourage proche travaillez-vous dans l'un des secteurs suivants ?",
             type: 'multiple',
-            note: 'STOP si l\'un des secteurs est coché (sauf "Aucun")',
+            note: `STOP si l'un des secteurs est coché (sauf "Aucun")`,
             options: [
                 { value: 'publicite', label: 'Publicité', stop: true },
                 { value: 'relations_publiques', label: 'Relations publiques', stop: true },
                 { value: 'journalisme', label: 'Journalisme', stop: true },
-                { value: 'electromenager', label: 'Fabrication ou distribution d\'appareils électroménagers', stop: true },
+                { value: 'electromenager', label: "Fabrication ou distribution d'appareils électroménagers", stop: true },
                 { value: 'etudes_marche', label: 'Études de marché ou sondages', stop: true },
                 { value: 'marketing', label: 'Marketing', stop: true },
                 { value: 'coiffure', label: 'Salon de coiffure / École de coiffure / Esthétisme', stop: true },
@@ -232,7 +232,7 @@ const STUDY_CONFIG = {
         {
             id: 'q2',
             title: 'Participation études récentes',
-            question: 'Avez-vous participé à un entretien ou un groupe de discussion au cours des 12 derniers mois sur l\'un des thèmes suivants ?',
+            question: "Avez-vous participé à un entretien ou un groupe de discussion au cours des 12 derniers mois sur l'un des thèmes suivants ?",
             type: 'multiple',
             note: 'STOP si sèche-cheveux ou fer à boucler/brosse chauffante',
             options: [
@@ -286,7 +286,7 @@ const STUDY_CONFIG = {
             options: [
                 { value: 'oui', label: 'Oui', stop: false },
                 { value: 'non_partis', label: 'Non, mes enfants ont quitté le nid', stop: false },
-                { value: 'non_pas_enfants', label: 'Je n\'ai pas d\'enfants', stop: false }
+                { value: 'non_pas_enfants', label: "Je n'ai pas d'enfants", stop: false }
             ]
         },
         
@@ -295,39 +295,39 @@ const STUDY_CONFIG = {
             title: 'Situation professionnelle',
             question: 'Quelle est votre situation professionnelle ?',
             type: 'single',
-            note: 'STOP si retraité ou recherche d\'emploi',
+            note: "STOP si retraité ou recherche d'emploi",
             options: [
                 { value: 'temps_plein', label: 'Travaille à temps plein', stop: false },
                 { value: 'temps_partiel', label: 'Travaille à temps partiel', stop: false },
                 { value: 'foyer', label: 'Au foyer', stop: false },
                 { value: 'etudiant', label: 'Étudiant(e)', stop: false },
                 { value: 'retraite', label: 'Retraité(e)', stop: true },
-                { value: 'recherche_emploi', label: 'En recherche d\'emploi', stop: true }
+                { value: 'recherche_emploi', label: "En recherche d'emploi", stop: true }
             ]
         },
         
         {
             id: 'q6a',
             title: 'Profession',
-            question: 'Quelle est votre profession et dans quel secteur d\'activités ?',
+            question: "Quelle est votre profession et dans quel secteur d'activités ?",
             type: 'double_text',
             note: 'Information collectée',
             fields: [
                 { key: 'profession', label: 'Profession' },
-                { key: 'secteur', label: 'Secteur d\'activités' }
+                { key: 'secteur', label: "Secteur d'activités" }
             ]
         },
         
         {
             id: 'q6b',
             title: 'Profession du conjoint',
-            question: 'Quelle est la profession de votre conjoint et dans quel secteur d\'activités ?',
+            question: "Quelle est la profession de votre conjoint et dans quel secteur d'activités ?",
             type: 'double_text',
             optional: true,
             note: 'Optionnel',
             fields: [
                 { key: 'profession_conjoint', label: 'Profession' },
-                { key: 'secteur_conjoint', label: 'Secteur d\'activités' }
+                { key: 'secteur_conjoint', label: "Secteur d'activités" }
             ]
         },
         
@@ -352,11 +352,11 @@ const STUDY_CONFIG = {
         {
             id: 'q8',
             title: 'Responsable achat',
-            question: 'Qui est responsable du choix et de l\'achat de sèche-cheveux dans votre foyer ?',
+            question: "Qui est responsable du choix et de l'achat de sèche-cheveux dans votre foyer ?",
             type: 'single',
             note: 'STOP si aucune décision',
             options: [
-                { value: 'entierement', label: 'Je suis entièrement responsable de la décision d\'achat', stop: false },
+                { value: 'entierement', label: "Je suis entièrement responsable de la décision d'achat", stop: false },
                 { value: 'partage', label: 'Je partage la décision avec une autre personne', stop: false },
                 { value: 'aucune', label: 'Je ne prends aucune décision', stop: true }
             ]
@@ -439,7 +439,7 @@ const STUDY_CONFIG = {
         {
             id: 'q11',
             title: 'Budget sèche-cheveux',
-            question: 'Combien seriez-vous prête à dépenser pour votre prochain achat d\'un sèche-cheveux ?',
+            question: "Combien seriez-vous prête à dépenser pour votre prochain achat d'un sèche-cheveux ?",
             type: 'number',
             min: 0,
             max: 2000,
@@ -474,7 +474,7 @@ const STUDY_CONFIG = {
         {
             id: 'q13',
             title: 'Épaisseur des cheveux',
-            question: 'Qu\'est-ce qui décrit le mieux l\'épaisseur de vos cheveux ?',
+            question: "Qu'est-ce qui décrit le mieux l'épaisseur de vos cheveux ?",
             type: 'single',
             note: 'Répartition équilibrée souhaitée',
             options: [
@@ -491,9 +491,9 @@ const STUDY_CONFIG = {
             type: 'single',
             note: 'STOP si courts/très courts. Types 3/4: au moins épaules quand étirés',
             options: [
-                { value: 'courts', label: 'Courts/très courts (jusqu\'au menton)', stop: true },
-                { value: 'epaules', label: 'Jusqu\'aux épaules', stop: false },
-                { value: 'aisselles', label: 'Jusqu\'aux aisselles', stop: false },
+                { value: 'courts', label: "Courts/très courts (jusqu'au menton)", stop: true },
+                { value: 'epaules', label: "Jusqu'aux épaules", stop: false },
+                { value: 'aisselles', label: "Jusqu'aux aisselles", stop: false },
                 { value: 'apres_aisselles', label: 'Après les aisselles', stop: false }
             ]
         },
@@ -510,7 +510,7 @@ const STUDY_CONFIG = {
                 { value: '5_6_fois', label: '5-6 fois par semaine', stop: false },
                 { value: '3_4_fois', label: '3-4 fois par semaine', stop: false },
                 { value: '1_2_fois', label: '1-2 fois par semaine', stop: true },
-                { value: 'moins_1_fois', label: 'Moins d\'1 fois par semaine', stop: true }
+                { value: 'moins_1_fois', label: "Moins d'1 fois par semaine", stop: true }
             ]
         },
         
@@ -525,7 +525,7 @@ const STUDY_CONFIG = {
                 { value: '5_6_fois', label: '5-6 fois par semaine', stop: false },
                 { value: '3_4_fois', label: '3-4 fois par semaine', stop: false },
                 { value: '1_2_fois', label: '1-2 fois par semaine', stop: false },
-                { value: 'moins_1_fois', label: 'Moins d\'1 fois par semaine', stop: true }
+                { value: 'moins_1_fois', label: "Moins d'1 fois par semaine", stop: true }
             ]
         },
         
@@ -547,7 +547,7 @@ const STUDY_CONFIG = {
         {
             id: 'q18',
             title: 'Intérêt multistyler',
-            question: 'Êtes-vous intéressée par l\'achat d\'un multistyler (ex. Dyson AirWrap ou FlexStyle) ?',
+            question: "Êtes-vous intéressée par l'achat d'un multistyler (ex. Dyson AirWrap ou FlexStyle) ?",
             type: 'single',
             note: 'STOP si non intéressée',
             showIf: (answers) => !answers.q9 || !answers.q9.values || !answers.q9.values.includes('multistyler'),
@@ -563,7 +563,7 @@ const STUDY_CONFIG = {
             title: 'Utilisateurs sèche-cheveux au foyer',
             question: 'Y compris vous-même, combien de personnes au sein de votre foyer utilisent le sèche-cheveux ?',
             type: 'single',
-            note: 'Objectif: maximum de foyers avec plus d\'1 utilisateur',
+            note: "Objectif: maximum de foyers avec plus d'1 utilisateur",
             options: [
                 { value: '1_personne', label: '1 personne', stop: false },
                 { value: '2_personnes', label: '2 personnes', stop: false },

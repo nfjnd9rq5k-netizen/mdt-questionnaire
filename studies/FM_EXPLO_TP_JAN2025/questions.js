@@ -191,7 +191,7 @@ const STUDY_CONFIG = {
         {
             id: 'q8b',
             title: 'Frequence',
-            question: 'Frequence d\'achat du jambon ?',
+            question: "Frequence d'achat du jambon ?",
             type: 'single',
             options: [
                 { value: 'semaine', label: '1 fois par semaine ou plus', stop: false },
@@ -241,7 +241,7 @@ const STUDY_CONFIG = {
         {
             id: 'q12',
             title: 'Marques refusees',
-            question: 'Quelles marques refuseriez-vous d\'acheter ?',
+            question: "Quelles marques refuseriez-vous d'acheter ?",
             type: 'multiple',
             options: [
                 { value: 'fleury_michon', label: 'Fleury Michon', stop: true },

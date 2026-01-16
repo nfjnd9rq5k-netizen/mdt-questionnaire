@@ -3,8 +3,8 @@ const STUDY_CONFIG = {
     
     
     studyId: 'TEMPLATE_ETUDE_2026',           
-    studyTitle: 'Titre de l\'étude',           
-    studyDate: 'Date de l\'étude',             // Ex: "Mardi 13 Janvier 2026"
+    studyTitle: "Titre de l'étude",           
+    studyDate: "Date de l'étude",             // Ex: "Mardi 13 Janvier 2026"
     reward: '50€',                             
     duration: '60 min',                        
     horaires: ['9h', '11h', '14h', '16h'],     

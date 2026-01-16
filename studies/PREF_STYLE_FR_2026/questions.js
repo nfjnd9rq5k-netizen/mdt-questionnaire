@@ -21,7 +21,7 @@
 
 const STUDY_CONFIG = {
     studyId: 'PREF_STYLE_FR_2026',
-    studyTitle: 'Comment préférez-vous qu\'une IA vous parle ?',
+    studyTitle: "Comment préférez-vous qu'une IA vous parle ?",
     studyDate: 'Janvier 2026',
     status: 'active',
     
@@ -103,7 +103,7 @@ const STUDY_CONFIG = {
         {
             id: 'p0_age',
             type: 'radio',
-            title: 'Quelle est votre tranche d\'âge ?',
+            title: "Quelle est votre tranche d'âge ?",
             required: true,
             options: [
                 { value: '18-24', label: '18-24 ans' },
@@ -146,7 +146,7 @@ const STUDY_CONFIG = {
         {
             id: 'p0_education',
             type: 'radio',
-            title: 'Quel est votre niveau d\'études ?',
+            title: "Quel est votre niveau d'études ?",
             required: true,
             options: [
                 { value: 'brevet', label: 'Brevet des collèges ou moins' },
@@ -154,7 +154,7 @@ const STUDY_CONFIG = {
                 { value: 'bac', label: 'Baccalauréat' },
                 { value: 'bac+2', label: 'Bac+2 (BTS, DUT, DEUG)' },
                 { value: 'bac+3', label: 'Bac+3 (Licence)' },
-                { value: 'bac+5', label: 'Bac+5 (Master, École d\'ingénieur, École de commerce)' },
+                { value: 'bac+5', label: "Bac+5 (Master, École d'ingénieur, École de commerce)" },
                 { value: 'bac+8', label: 'Bac+8 (Doctorat)' }
             ]
         },
@@ -168,10 +168,10 @@ const STUDY_CONFIG = {
                 { value: 'employe', label: 'Employé(e) / Ouvrier(ère)' },
                 { value: 'cadre', label: 'Cadre / Profession intellectuelle' },
                 { value: 'independant', label: 'Indépendant(e) / Freelance' },
-                { value: 'chef_entreprise', label: 'Chef d\'entreprise' },
+                { value: 'chef_entreprise', label: "Chef d'entreprise" },
                 { value: 'fonctionnaire', label: 'Fonctionnaire' },
                 { value: 'retraite', label: 'Retraité(e)' },
-                { value: 'recherche_emploi', label: 'En recherche d\'emploi' },
+                { value: 'recherche_emploi', label: "En recherche d'emploi" },
                 { value: 'autre', label: 'Autre' }
             ]
         },
@@ -265,7 +265,7 @@ const STUDY_CONFIG = {
                 { value: 'ton_adapte', label: 'Le ton est plus adapté à la situation' },
                 { value: 'plus_naturel', label: 'Ça semble plus naturel' },
                 { value: 'plus_efficace', label: 'Ça sera plus efficace pour obtenir ce que je veux' },
-                { value: 'plus_respectueux', label: 'C\'est plus respectueux / professionnel' },
+                { value: 'plus_respectueux', label: "C'est plus respectueux / professionnel" },
                 { value: 'me_ressemble', label: 'Ça me ressemble plus' },
                 { value: 'relation_manager', label: 'Ça correspond à ma relation avec mon manager' }
             ]
@@ -351,12 +351,12 @@ const STUDY_CONFIG = {
             title: 'Pourquoi avez-vous choisi cette réponse ?',
             required: true,
             options: [
-                { value: 'rassurant', label: 'C\'est plus rassurant' },
-                { value: 'complet', label: 'C\'est plus complet' },
-                { value: 'clair', label: 'C\'est plus clair et organisé' },
+                { value: 'rassurant', label: "C'est plus rassurant" },
+                { value: 'complet', label: "C'est plus complet" },
+                { value: 'clair', label: "C'est plus clair et organisé" },
                 { value: 'humain', label: 'Ça semble plus humain' },
-                { value: 'utile', label: 'C\'est plus utile concrètement' },
-                { value: 'pas_condescendant', label: 'Ce n\'est pas condescendant' }
+                { value: 'utile', label: "C'est plus utile concrètement" },
+                { value: 'pas_condescendant', label: "Ce n'est pas condescendant" }
             ]
         },
 
@@ -488,7 +488,7 @@ const STUDY_CONFIG = {
             required: true,
             options: [
                 { value: 'pratique', label: 'Plus pratique et applicable' },
-                { value: 'comprehensif', label: 'Ça montre qu\'on me comprend' },
+                { value: 'comprehensif', label: "Ça montre qu'on me comprend" },
                 { value: 'serieux', label: 'Plus sérieux et crédible' },
                 { value: 'chaleureux', label: 'Plus chaleureux et humain' },
                 { value: 'complet', label: 'Plus complet' },
@@ -576,7 +576,7 @@ const STUDY_CONFIG = {
             options: [
                 { value: 'comprehensible', label: 'Plus facile à comprendre' },
                 { value: 'complet', label: 'Plus complet et précis' },
-                { value: 'exemples', label: 'Les exemples m\'aident' },
+                { value: 'exemples', label: "Les exemples m'aident" },
                 { value: 'niveau_adapte', label: 'Adapté à mon niveau' },
                 { value: 'pas_infantilisant', label: 'Ne me prend pas pour un idiot' },
                 { value: 'actionnable', label: 'Je sais quoi faire avec cette info' }
@@ -588,8 +588,8 @@ const STUDY_CONFIG = {
             title: 'Comment évaluez-vous votre niveau en informatique / technologie ?',
             required: true,
             options: [
-                { value: 'debutant', label: 'Débutant (j\'utilise les bases)' },
-                { value: 'intermediaire', label: 'Intermédiaire (à l\'aise avec la plupart des outils)' },
+                { value: 'debutant', label: "Débutant (j'utilise les bases)" },
+                { value: 'intermediaire', label: "Intermédiaire (à l'aise avec la plupart des outils)" },
                 { value: 'avance', label: 'Avancé (je comprends les concepts techniques)' },
                 { value: 'expert', label: 'Expert (je travaille dans le domaine)' }
             ]
@@ -677,9 +677,9 @@ const STUDY_CONFIG = {
             title: 'Pourquoi avez-vous choisi cette réponse ?',
             required: true,
             options: [
-                { value: 'rapide', label: 'Je veux l\'info rapidement' },
-                { value: 'details', label: 'J\'aime avoir tous les détails' },
-                { value: 'astuces', label: 'Les astuces m\'aident' },
+                { value: 'rapide', label: "Je veux l'info rapidement" },
+                { value: 'details', label: "J'aime avoir tous les détails" },
+                { value: 'astuces', label: "Les astuces m'aident" },
                 { value: 'niveau', label: 'Adapté à mon niveau en cuisine' },
                 { value: 'pratique', label: 'Plus pratique à suivre en cuisinant' },
                 { value: 'confiance', label: 'Je me sens plus en confiance' }
@@ -693,7 +693,7 @@ const STUDY_CONFIG = {
             options: [
                 { value: 'debutant', label: 'Débutant (je suis les recettes à la lettre)' },
                 { value: 'intermediaire', label: 'Intermédiaire (je me débrouille bien)' },
-                { value: 'avance', label: 'Avancé (je cuisine souvent et j\'improvise)' },
+                { value: 'avance', label: "Avancé (je cuisine souvent et j'improvise)" },
                 { value: 'expert', label: 'Expert / Passionné' }
             ]
         },
@@ -772,9 +772,9 @@ const STUDY_CONFIG = {
             options: [
                 { value: 'facile_reference', label: 'Plus facile à consulter sur place' },
                 { value: 'agreable_lire', label: 'Plus agréable à lire' },
-                { value: 'inspire', label: 'Ça m\'inspire plus / me donne envie' },
+                { value: 'inspire', label: "Ça m'inspire plus / me donne envie" },
                 { value: 'pratique', label: 'Plus pratique pour planifier' },
-                { value: 'conseils_perso', label: 'Les conseils personnels m\'aident' },
+                { value: 'conseils_perso', label: "Les conseils personnels m'aident" },
                 { value: 'complet', label: 'Plus complet' }
             ]
         },
@@ -847,8 +847,8 @@ const STUDY_CONFIG = {
             required: true,
             options: [
                 { value: 'clair', label: 'Plus clair et facile à suivre' },
-                { value: 'checklist', label: 'Je peux l\'utiliser comme checklist' },
-                { value: 'contexte', label: 'Le contexte m\'aide à comprendre' },
+                { value: 'checklist', label: "Je peux l'utiliser comme checklist" },
+                { value: 'contexte', label: "Le contexte m'aide à comprendre" },
                 { value: 'rassure', label: 'Ça me rassure sur la démarche' },
                 { value: 'complet', label: 'Toutes les infos importantes sont là' },
                 { value: 'lisible', label: 'Plus agréable à lire' }
@@ -935,9 +935,9 @@ const STUDY_CONFIG = {
             title: 'Longueur : La réponse a-t-elle la bonne longueur ?',
             required: true,
             options: [
-                { value: 'trop_court', label: 'Trop courte, j\'aurais voulu plus de détails' },
+                { value: 'trop_court', label: "Trop courte, j'aurais voulu plus de détails" },
                 { value: 'juste', label: 'Longueur parfaite' },
-                { value: 'trop_long', label: 'Trop longue, j\'aurais préféré plus concis' }
+                { value: 'trop_long', label: "Trop longue, j'aurais préféré plus concis" }
             ]
         },
         {
@@ -958,7 +958,7 @@ const STUDY_CONFIG = {
         {
             id: 'p3_attention_check',
             type: 'radio',
-            title: '⚠️ Vérification : Quelle était la question posée à l\'IA dans l\'évaluation précédente ?',
+            title: "⚠️ Vérification : Quelle était la question posée à l'IA dans l'évaluation précédente ?",
             required: true,
             options: [
                 { value: 'recette', label: 'Une recette de cuisine' },
@@ -1005,14 +1005,14 @@ const STUDY_CONFIG = {
         {
             id: 'p3_eval2_amelioration',
             type: 'multiple',
-            title: 'Qu\'est-ce qui pourrait améliorer cette réponse ? (plusieurs choix)',
+            title: "Qu'est-ce qui pourrait améliorer cette réponse ? (plusieurs choix)",
             required: true,
             options: [
                 { value: 'moins_formel', label: 'Ton moins formel, plus décontracté' },
                 { value: 'tutoiement', label: 'Utiliser le tutoiement' },
                 { value: 'avis_perso', label: 'Donner un avis personnel / recommandation' },
                 { value: 'prix', label: 'Indiquer les prix approximatifs' },
-                { value: 'plus_options', label: 'Plus d\'options' },
+                { value: 'plus_options', label: "Plus d'options" },
                 { value: 'quartier', label: 'Demander le quartier recherché' },
                 { value: 'rien', label: 'La réponse est très bien comme ça' }
             ]
@@ -1037,12 +1037,12 @@ const STUDY_CONFIG = {
             id: 'p4_reformulation1',
             type: 'textarea',
             title: 'Reformulez naturellement :',
-            text: '"Je suis dans l\'impossibilité de vous fournir une assistance sur ce sujet."',
+            text: `"Je suis dans l'impossibilité de vous fournir une assistance sur ce sujet."`,
             placeholder: 'Écrivez comme vous diriez ça naturellement...',
             required: true,
             minLength: 10,
             maxLength: 500,
-            metadata: { original_sentence: 'Je suis dans l\'impossibilité de vous fournir une assistance sur ce sujet.', register: 'formal_robotic' }
+            metadata: { original_sentence: "Je suis dans l'impossibilité de vous fournir une assistance sur ce sujet.", register: 'formal_robotic' }
         },
         {
             id: 'p4_reformulation2',
@@ -1070,23 +1070,23 @@ const STUDY_CONFIG = {
             id: 'p4_reformulation4',
             type: 'textarea',
             title: 'Reformulez naturellement :',
-            text: '"Il serait pertinent de considérer les différentes alternatives qui s\'offrent à vous."',
+            text: `"Il serait pertinent de considérer les différentes alternatives qui s'offrent à vous."`,
             placeholder: 'Écrivez comme vous diriez ça naturellement...',
             required: true,
             minLength: 10,
             maxLength: 500,
-            metadata: { original_sentence: 'Il serait pertinent de considérer les différentes alternatives qui s\'offrent à vous.', register: 'formal_suggestion' }
+            metadata: { original_sentence: "Il serait pertinent de considérer les différentes alternatives qui s'offrent à vous.", register: 'formal_suggestion' }
         },
         {
             id: 'p4_reformulation5',
             type: 'textarea',
             title: 'Reformulez naturellement :',
-            text: '"N\'hésitez pas à revenir vers moi si vous avez des questions supplémentaires."',
+            text: `"N'hésitez pas à revenir vers moi si vous avez des questions supplémentaires."`,
             placeholder: 'Écrivez comme vous diriez ça naturellement...',
             required: true,
             minLength: 10,
             maxLength: 500,
-            metadata: { original_sentence: 'N\'hésitez pas à revenir vers moi si vous avez des questions supplémentaires.', register: 'closing_formula' }
+            metadata: { original_sentence: "N'hésitez pas à revenir vers moi si vous avez des questions supplémentaires.", register: 'closing_formula' }
         },
 
         // ============================================================
@@ -1103,13 +1103,13 @@ const STUDY_CONFIG = {
         {
             id: 'p5_tutoiement',
             type: 'radio',
-            title: 'Préférez-vous qu\'une IA vous tutoie ou vous vouvoie ?',
+            title: "Préférez-vous qu'une IA vous tutoie ou vous vouvoie ?",
             required: true,
             options: [
-                { value: 'tutoiement', label: 'Tutoiement - c\'est plus naturel et sympa' },
-                { value: 'vouvoiement', label: 'Vouvoiement - c\'est plus respectueux' },
+                { value: 'tutoiement', label: "Tutoiement - c'est plus naturel et sympa" },
+                { value: 'vouvoiement', label: "Vouvoiement - c'est plus respectueux" },
                 { value: 'depends_context', label: 'Ça dépend du contexte' },
-                { value: 'indifferent', label: 'Ça m\'est égal' }
+                { value: 'indifferent', label: "Ça m'est égal" }
             ]
         },
         {
@@ -1124,17 +1124,17 @@ const STUDY_CONFIG = {
                 { value: 'sante', label: 'Questions de santé' },
                 { value: 'finance', label: 'Questions financières / juridiques' },
                 { value: 'serieux', label: 'Sujets sérieux en général' },
-                { value: 'premiere_fois', label: 'Première interaction avec l\'IA' }
+                { value: 'premiere_fois', label: "Première interaction avec l'IA" }
             ]
         },
         {
             id: 'p5_emojis',
             type: 'radio',
-            title: 'Que pensez-vous de l\'utilisation d\'emojis par une IA ?',
+            title: "Que pensez-vous de l'utilisation d'emojis par une IA ?",
             required: true,
             options: [
-                { value: 'aime', label: 'J\'aime bien, ça rend la conversation plus sympa 😊' },
-                { value: 'modere', label: 'Avec modération, 1-2 emojis max c\'est OK' },
+                { value: 'aime', label: "J'aime bien, ça rend la conversation plus sympa 😊" },
+                { value: 'modere', label: "Avec modération, 1-2 emojis max c'est OK" },
                 { value: 'prefere_pas', label: 'Je préfère sans, ça fait pas sérieux' },
                 { value: 'depends', label: 'Ça dépend du contexte' }
             ]
@@ -1145,10 +1145,10 @@ const STUDY_CONFIG = {
             title: 'En général, quelle longueur de réponse préférez-vous ?',
             required: true,
             options: [
-                { value: 'tres_court', label: 'Très court - juste l\'essentiel, quelques phrases' },
+                { value: 'tres_court', label: "Très court - juste l'essentiel, quelques phrases" },
                 { value: 'court', label: 'Court - un paragraphe bien résumé' },
                 { value: 'moyen', label: 'Moyen - assez de détails mais pas trop' },
-                { value: 'long', label: 'Long - j\'aime avoir tous les détails' },
+                { value: 'long', label: "Long - j'aime avoir tous les détails" },
                 { value: 'depends', label: 'Ça dépend de la question' }
             ]
         },
@@ -1175,7 +1175,7 @@ const STUDY_CONFIG = {
                 { value: 'chaleureuse', label: 'Chaleureuse et empathique' },
                 { value: 'directe', label: 'Directe et efficace' },
                 { value: 'patiente', label: 'Patiente et pédagogue' },
-                { value: 'drole', label: 'Avec un peu d\'humour' },
+                { value: 'drole', label: "Avec un peu d'humour" },
                 { value: 'humble', label: 'Humble (reconnaît ses limites)' },
                 { value: 'proactive', label: 'Proactive (anticipe mes besoins)' },
                 { value: 'neutre', label: 'Neutre et objective' }
@@ -1184,7 +1184,7 @@ const STUDY_CONFIG = {
         {
             id: 'p5_agacement',
             type: 'multiple',
-            title: 'Qu\'est-ce qui vous agace le plus chez une IA ? (3 choix maximum)',
+            title: "Qu'est-ce qui vous agace le plus chez une IA ? (3 choix maximum)",
             required: true,
             maxSelections: 3,
             options: [
@@ -1201,7 +1201,7 @@ const STUDY_CONFIG = {
         {
             id: 'p5_commentaire_libre',
             type: 'textarea',
-            title: 'Avez-vous d\'autres remarques sur la façon dont une IA devrait communiquer ?',
+            title: "Avez-vous d'autres remarques sur la façon dont une IA devrait communiquer ?",
             placeholder: 'Partagez vos idées librement... (optionnel)',
             required: false,
             maxLength: 1000
@@ -1231,17 +1231,17 @@ const STUDY_CONFIG = {
             options: [
                 { value: 'oui', label: 'Oui, à toutes' },
                 { value: 'presque', label: 'Oui, presque toutes' },
-                { value: 'pas_toujours', label: 'Pas toujours (j\'ai répondu vite sur certaines)' }
+                { value: 'pas_toujours', label: "Pas toujours (j'ai répondu vite sur certaines)" }
             ]
         },
         {
             id: 'p6_recontact',
             type: 'radio',
-            title: 'Accepteriez-vous de participer à d\'autres questionnaires similaires ?',
+            title: "Accepteriez-vous de participer à d'autres questionnaires similaires ?",
             required: true,
             options: [
                 { value: 'oui', label: 'Oui, avec plaisir' },
-                { value: 'si_remunere', label: 'Oui, si c\'est rémunéré' },
+                { value: 'si_remunere', label: "Oui, si c'est rémunéré" },
                 { value: 'non', label: 'Non merci' }
             ]
         }

@@ -103,7 +103,7 @@ const STUDY_CONFIG = {
         {
             id: 'p0_age',
             type: 'radio',
-            title: 'Quelle est votre tranche d\'âge ?',
+            title: "Quelle est votre tranche d'âge ?",
             required: true,
             options: [
                 { value: '18-24', label: '18-24 ans' },
@@ -125,11 +125,11 @@ const STUDY_CONFIG = {
                 { value: 'est', label: 'Est (Alsace, Lorraine, Champagne)' },
                 { value: 'ouest', label: 'Ouest (Bretagne, Pays de la Loire, Normandie)' },
                 { value: 'sud_ouest', label: 'Sud-Ouest (Bordeaux, Toulouse, Pays Basque)' },
-                { value: 'sud_est', label: 'Sud-Est (PACA, Marseille, Nice, Côte d\'Azur)' },
+                { value: 'sud_est', label: "Sud-Est (PACA, Marseille, Nice, Côte d'Azur)" },
                 { value: 'rhone_alpes', label: 'Rhône-Alpes (Lyon, Grenoble, Savoie)' },
                 { value: 'centre', label: 'Centre (Auvergne, Bourgogne, Centre)' },
                 { value: 'outre_mer', label: 'Outre-mer (DOM-TOM)' },
-                { value: 'etranger', label: 'À l\'étranger (francophone)' }
+                { value: 'etranger', label: "À l'étranger (francophone)" }
             ]
         },
         {
@@ -140,8 +140,8 @@ const STUDY_CONFIG = {
             options: [
                 { value: 'oui_unique', label: 'Oui, ma seule langue maternelle' },
                 { value: 'oui_bilingue', label: 'Oui, avec une autre langue (bilingue)' },
-                { value: 'non_tres_jeune', label: 'Non, mais je l\'ai appris très jeune (avant 6 ans)' },
-                { value: 'non_plus_tard', label: 'Non, je l\'ai appris plus tard' }
+                { value: 'non_tres_jeune', label: "Non, mais je l'ai appris très jeune (avant 6 ans)" },
+                { value: 'non_plus_tard', label: "Non, je l'ai appris plus tard" }
             ]
         },
         {
@@ -153,7 +153,7 @@ const STUDY_CONFIG = {
                 { value: 'natif', label: 'Natif - je connais toutes les expressions' },
                 { value: 'tres_bon', label: 'Très bon - je comprends presque tout' },
                 { value: 'bon', label: 'Bon - je comprends la plupart des expressions' },
-                { value: 'moyen', label: 'Moyen - certaines expressions m\'échappent' }
+                { value: 'moyen', label: "Moyen - certaines expressions m'échappent" }
             ]
         },
         {
@@ -197,7 +197,7 @@ const STUDY_CONFIG = {
         {
             id: 'p1_expr1_exemple',
             type: 'textarea',
-            title: 'Donnez un exemple d\'utilisation de "avoir le cafard" dans une phrase.',
+            title: `Donnez un exemple d'utilisation de "avoir le cafard" dans une phrase.`,
             placeholder: 'Par exemple : "..."',
             required: true,
             minLength: 20,
@@ -210,9 +210,9 @@ const STUDY_CONFIG = {
             title: 'Dans quel contexte utiliseriez-vous "avoir le cafard" ?',
             required: true,
             options: [
-                { value: 'tous', label: 'N\'importe quel contexte (famille, amis, travail)' },
+                { value: 'tous', label: "N'importe quel contexte (famille, amis, travail)" },
                 { value: 'informel', label: 'Seulement en contexte informel (amis, famille)' },
-                { value: 'oral', label: 'Surtout à l\'oral' },
+                { value: 'oral', label: "Surtout à l'oral" },
                 { value: 'vieilli', label: 'Expression un peu vieillie / moins utilisée' }
             ],
             metadata: { expression: 'avoir le cafard', type: 'register' }
@@ -232,7 +232,7 @@ const STUDY_CONFIG = {
         {
             id: 'p1_expr2_exemple',
             type: 'textarea',
-            title: 'Donnez un exemple d\'utilisation dans une phrase.',
+            title: "Donnez un exemple d'utilisation dans une phrase.",
             placeholder: 'Par exemple : "..."',
             required: true,
             minLength: 20,
@@ -242,7 +242,7 @@ const STUDY_CONFIG = {
         {
             id: 'p1_expr2_variante',
             type: 'textarea',
-            title: 'Connaissez-vous d\'autres façons de dire la même chose ? (synonymes ou variantes)',
+            title: "Connaissez-vous d'autres façons de dire la même chose ? (synonymes ou variantes)",
             placeholder: 'On peut aussi dire...',
             required: false,
             maxLength: 300,
@@ -286,22 +286,22 @@ const STUDY_CONFIG = {
         {
             id: 'p1_expr4_sens',
             type: 'textarea',
-            title: 'Que signifie "c\'est pas la mer à boire" ?',
+            title: `Que signifie "c'est pas la mer à boire" ?`,
             placeholder: 'Ça veut dire...',
             required: true,
             minLength: 20,
             maxLength: 500,
-            metadata: { expression: 'c\'est pas la mer à boire', type: 'explanation' }
+            metadata: { expression: "c'est pas la mer à boire", type: 'explanation' }
         },
         {
             id: 'p1_expr4_contexte',
             type: 'textarea',
             title: 'Dans quelle situation utiliseriez-vous cette expression ?',
-            placeholder: 'Par exemple quand quelqu\'un...',
+            placeholder: "Par exemple quand quelqu'un...",
             required: true,
             minLength: 20,
             maxLength: 500,
-            metadata: { expression: 'c\'est pas la mer à boire', type: 'context' }
+            metadata: { expression: "c'est pas la mer à boire", type: 'context' }
         },
 
         // Attention check
@@ -325,7 +325,7 @@ const STUDY_CONFIG = {
             type: 'textarea',
             title: 'Quelle est votre expression française préférée ?',
             text: 'Une expression que vous utilisez souvent ou que vous trouvez particulièrement colorée.',
-            placeholder: 'Mon expression préférée c\'est...',
+            placeholder: "Mon expression préférée c'est...",
             required: true,
             minLength: 10,
             maxLength: 200,
@@ -359,8 +359,8 @@ const STUDY_CONFIG = {
         {
             id: 'p2_oral1',
             type: 'textarea',
-            title: 'Comment diriez-vous "Je ne sais pas" à l\'oral, entre amis ?',
-            text: 'Écrivez comme vous le DITES vraiment, pas comme vous l\'écrivez.',
+            title: `Comment diriez-vous "Je ne sais pas" à l'oral, entre amis ?`,
+            text: "Écrivez comme vous le DITES vraiment, pas comme vous l'écrivez.",
             placeholder: 'Moi je dis plutôt...',
             required: true,
             minLength: 3,
@@ -370,22 +370,22 @@ const STUDY_CONFIG = {
         {
             id: 'p2_oral2',
             type: 'textarea',
-            title: 'Comment diriez-vous "Il n\'y a pas de problème" à l\'oral ?',
+            title: `Comment diriez-vous "Il n'y a pas de problème" à l'oral ?`,
             placeholder: 'Moi je dis...',
             required: true,
             minLength: 3,
             maxLength: 200,
-            metadata: { formal: 'Il n\'y a pas de problème', type: 'oral_variant' }
+            metadata: { formal: "Il n'y a pas de problème", type: 'oral_variant' }
         },
         {
             id: 'p2_oral3',
             type: 'textarea',
-            title: 'Comment diriez-vous "C\'est très bien" à l\'oral ? (donnez plusieurs options si vous en avez)',
+            title: `Comment diriez-vous "C'est très bien" à l'oral ? (donnez plusieurs options si vous en avez)`,
             placeholder: 'On peut dire...',
             required: true,
             minLength: 3,
             maxLength: 300,
-            metadata: { formal: 'C\'est très bien', type: 'oral_variant' }
+            metadata: { formal: "C'est très bien", type: 'oral_variant' }
         },
 
         // Argot actuel
@@ -402,9 +402,9 @@ const STUDY_CONFIG = {
             title: 'Connaissez-vous le mot "chanmé" ?',
             required: true,
             options: [
-                { value: 'utilise', label: 'Oui, je l\'utilise' },
-                { value: 'connait', label: 'Oui, je connais mais j\'utilise pas' },
-                { value: 'entendu', label: 'J\'ai déjà entendu mais pas sûr du sens' },
+                { value: 'utilise', label: "Oui, je l'utilise" },
+                { value: 'connait', label: "Oui, je connais mais j'utilise pas" },
+                { value: 'entendu', label: "J'ai déjà entendu mais pas sûr du sens" },
                 { value: 'non', label: 'Non, je ne connais pas' }
             ]
         },
@@ -424,16 +424,16 @@ const STUDY_CONFIG = {
             title: 'Connaissez-vous le mot "osef" ?',
             required: true,
             options: [
-                { value: 'utilise', label: 'Oui, je l\'utilise' },
-                { value: 'connait', label: 'Oui, je connais mais j\'utilise pas' },
-                { value: 'entendu', label: 'J\'ai déjà entendu mais pas sûr du sens' },
+                { value: 'utilise', label: "Oui, je l'utilise" },
+                { value: 'connait', label: "Oui, je connais mais j'utilise pas" },
+                { value: 'entendu', label: "J'ai déjà entendu mais pas sûr du sens" },
                 { value: 'non', label: 'Non, je ne connais pas' }
             ]
         },
         {
             id: 'p2_argot2_def',
             type: 'textarea',
-            title: 'Si vous connaissez "osef", expliquez ce que ça veut dire et d\'où ça vient.',
+            title: `Si vous connaissez "osef", expliquez ce que ça veut dire et d'où ça vient.`,
             placeholder: 'Ça veut dire... Ça vient de...',
             required: false,
             maxLength: 300,
@@ -443,31 +443,31 @@ const STUDY_CONFIG = {
         {
             id: 'p2_argot3_connait',
             type: 'radio',
-            title: 'Connaissez-vous l\'expression "c\'est le seum" ?',
+            title: `Connaissez-vous l'expression "c'est le seum" ?`,
             required: true,
             options: [
-                { value: 'utilise', label: 'Oui, je l\'utilise' },
-                { value: 'connait', label: 'Oui, je connais mais j\'utilise pas' },
-                { value: 'entendu', label: 'J\'ai déjà entendu mais pas sûr du sens' },
+                { value: 'utilise', label: "Oui, je l'utilise" },
+                { value: 'connait', label: "Oui, je connais mais j'utilise pas" },
+                { value: 'entendu', label: "J'ai déjà entendu mais pas sûr du sens" },
                 { value: 'non', label: 'Non, je ne connais pas' }
             ]
         },
         {
             id: 'p2_argot3_exemple',
             type: 'textarea',
-            title: 'Si vous connaissez "c\'est le seum", donnez un exemple de situation où on l\'utilise.',
+            title: `Si vous connaissez "c'est le seum", donnez un exemple de situation où on l'utilise.`,
             placeholder: 'On dit ça quand...',
             required: false,
             maxLength: 400,
             showIf: { questionId: 'p2_argot3_connait', values: ['utilise', 'connait'] },
-            metadata: { term: 'c\'est le seum', type: 'example' }
+            metadata: { term: "c'est le seum", type: 'example' }
         },
 
         // Mots/expressions que le participant utilise
         {
             id: 'p2_argot_perso',
             type: 'textarea',
-            title: 'Quels mots ou expressions d\'argot utilisez-vous régulièrement ?',
+            title: "Quels mots ou expressions d'argot utilisez-vous régulièrement ?",
             text: 'Listez 3 à 5 mots/expressions avec leur signification.',
             placeholder: '- "..." = ...\n- "..." = ...\n- "..." = ...',
             required: true,
@@ -496,7 +496,7 @@ const STUDY_CONFIG = {
             required: true,
             options: [
                 { value: 'fan', label: 'Oui, je suis fan !' },
-                { value: 'connait', label: 'Oui, j\'ai vu quelques épisodes' },
+                { value: 'connait', label: "Oui, j'ai vu quelques épisodes" },
                 { value: 'nom', label: 'Oui, de nom, mais jamais vu' },
                 { value: 'non', label: 'Non, je ne connais pas' }
             ]
@@ -530,7 +530,7 @@ const STUDY_CONFIG = {
             required: true,
             options: [
                 { value: 'fan', label: 'Oui, je les adore !' },
-                { value: 'vu', label: 'Oui, j\'ai vu au moins un' },
+                { value: 'vu', label: "Oui, j'ai vu au moins un" },
                 { value: 'nom', label: 'De nom seulement' },
                 { value: 'non', label: 'Non' }
             ]
@@ -538,7 +538,7 @@ const STUDY_CONFIG = {
         {
             id: 'p3_oss117_replique',
             type: 'textarea',
-            title: 'Citez une réplique culte d\'OSS 117 (si vous en connaissez).',
+            title: "Citez une réplique culte d'OSS 117 (si vous en connaissez).",
             placeholder: '« ... »',
             required: false,
             maxLength: 300,
@@ -554,7 +554,7 @@ const STUDY_CONFIG = {
             required: true,
             options: [
                 { value: 'fan', label: 'Oui, ce sont des classiques !' },
-                { value: 'quelques', label: 'Oui, j\'en connais quelques-uns' },
+                { value: 'quelques', label: "Oui, j'en connais quelques-uns" },
                 { value: 'nom', label: 'De nom seulement' },
                 { value: 'non', label: 'Non, je ne connais pas' }
             ]
@@ -584,8 +584,8 @@ const STUDY_CONFIG = {
         {
             id: 'p3_ref_libre_explication',
             type: 'textarea',
-            title: 'Expliquez pourquoi c\'est une référence si connue et comment elle est utilisée.',
-            placeholder: 'C\'est connu parce que... On l\'utilise pour...',
+            title: "Expliquez pourquoi c'est une référence si connue et comment elle est utilisée.",
+            placeholder: "C'est connu parce que... On l'utilise pour...",
             required: true,
             minLength: 40,
             maxLength: 600,
@@ -671,9 +671,9 @@ const STUDY_CONFIG = {
         {
             id: 'p4_apero',
             type: 'textarea',
-            title: 'Expliquez le concept de "l\'apéro" à un étranger.',
-            text: 'C\'est quoi ? Ça se passe comment ? Qu\'est-ce qu\'on sert ?',
-            placeholder: 'L\'apéro, c\'est...',
+            title: `Expliquez le concept de "l'apéro" à un étranger.`,
+            text: "C'est quoi ? Ça se passe comment ? Qu'est-ce qu'on sert ?",
+            placeholder: "L'apéro, c'est...",
             required: true,
             minLength: 60,
             maxLength: 700,
@@ -714,7 +714,7 @@ const STUDY_CONFIG = {
             type: 'textarea',
             title: '❓ "Pourquoi il y a autant de grèves en France ?"',
             text: 'Un ami américain vous pose cette question. Que lui répondez-vous ?',
-            placeholder: 'Alors, en France, les grèves c\'est...',
+            placeholder: "Alors, en France, les grèves c'est...",
             required: true,
             minLength: 80,
             maxLength: 1000,
@@ -726,7 +726,7 @@ const STUDY_CONFIG = {
             id: 'p5_repas',
             type: 'textarea',
             title: '❓ "Pourquoi les Français passent autant de temps à table ?"',
-            placeholder: 'C\'est parce que pour nous...',
+            placeholder: "C'est parce que pour nous...",
             required: true,
             minLength: 60,
             maxLength: 800,
@@ -737,7 +737,7 @@ const STUDY_CONFIG = {
         {
             id: 'p5_raler',
             type: 'textarea',
-            title: '❓ "On dit que les Français râlent tout le temps, c\'est vrai ?"',
+            title: `❓ "On dit que les Français râlent tout le temps, c'est vrai ?"`,
             placeholder: 'Alors oui et non... En fait...',
             required: true,
             minLength: 60,
@@ -750,7 +750,7 @@ const STUDY_CONFIG = {
             id: 'p5_question_libre',
             type: 'textarea',
             title: 'Quelle question sur la France un étranger vous a-t-il déjà posée (ou pourrait vous poser) ?',
-            placeholder: 'On m\'a déjà demandé...',
+            placeholder: "On m'a déjà demandé...",
             required: true,
             minLength: 20,
             maxLength: 400,
@@ -759,7 +759,7 @@ const STUDY_CONFIG = {
         {
             id: 'p5_question_libre_reponse',
             type: 'textarea',
-            title: 'Et qu\'avez-vous répondu (ou que répondriez-vous) ?',
+            title: "Et qu'avez-vous répondu (ou que répondriez-vous) ?",
             placeholder: 'Je lui ai expliqué que...',
             required: true,
             minLength: 60,
@@ -828,7 +828,7 @@ const STUDY_CONFIG = {
             id: 'p6_expression_regionale',
             type: 'textarea',
             title: 'Quelle expression ou mot typique de votre région utilisez-vous ?',
-            text: 'Une expression que les gens d\'autres régions ne connaissent pas forcément.',
+            text: "Une expression que les gens d'autres régions ne connaissent pas forcément.",
             placeholder: 'Chez nous on dit...',
             required: true,
             minLength: 20,
@@ -838,8 +838,8 @@ const STUDY_CONFIG = {
         {
             id: 'p6_expression_regionale_sens',
             type: 'textarea',
-            title: 'Que signifie cette expression et dans quel contexte l\'utilisez-vous ?',
-            placeholder: 'Ça veut dire... On l\'utilise quand...',
+            title: "Que signifie cette expression et dans quel contexte l'utilisez-vous ?",
+            placeholder: "Ça veut dire... On l'utilise quand...",
             required: true,
             minLength: 30,
             maxLength: 500,
@@ -849,8 +849,8 @@ const STUDY_CONFIG = {
         {
             id: 'p6_accent',
             type: 'textarea',
-            title: 'Comment décririez-vous l\'accent de votre région à quelqu\'un qui ne le connaît pas ?',
-            placeholder: 'L\'accent de chez nous, c\'est...',
+            title: "Comment décririez-vous l'accent de votre région à quelqu'un qui ne le connaît pas ?",
+            placeholder: "L'accent de chez nous, c'est...",
             required: false,
             maxLength: 500,
             metadata: { type: 'accent_description' }
@@ -875,7 +875,7 @@ const STUDY_CONFIG = {
         {
             id: 'p7_commentaire',
             type: 'textarea',
-            title: 'Un dernier commentaire ? Quelque chose qu\'on aurait dû demander ?',
+            title: "Un dernier commentaire ? Quelque chose qu'on aurait dû demander ?",
             placeholder: 'Optionnel...',
             required: false,
             maxLength: 800
@@ -883,11 +883,11 @@ const STUDY_CONFIG = {
         {
             id: 'p7_recontact',
             type: 'radio',
-            title: 'Accepteriez-vous de participer à d\'autres questionnaires ?',
+            title: "Accepteriez-vous de participer à d'autres questionnaires ?",
             required: true,
             options: [
                 { value: 'oui', label: 'Oui, avec plaisir' },
-                { value: 'si_remunere', label: 'Oui, si c\'est rémunéré' },
+                { value: 'si_remunere', label: "Oui, si c'est rémunéré" },
                 { value: 'non', label: 'Non merci' }
             ]
         }
