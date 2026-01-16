@@ -4,11 +4,11 @@
  */
 
 // === MODE DEMO ===
-// Mettre à false quand le backend est prêt
-const DEMO_MODE = true;
+// Mettre à false pour utiliser le vrai backend
+const DEMO_MODE = false;
 
 // URL de l'API
-const API_BASE_URL = 'https://etudes.lamaisondutest.fr/api/mobile';
+const API_BASE_URL = 'https://mediumvioletred-elephant-640253.hostingersite.com/api/mobile';
 
 // Données de démo
 const DEMO_USER = {
