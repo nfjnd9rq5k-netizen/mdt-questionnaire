@@ -100,4 +100,36 @@ api/secure_data/      # Protected directory (credentials, keys)
 js/engine.js          # Core questionnaire logic
 studies/_TEMPLATE_ETUDE/  # Copy this for new studies
 database/schema.sql   # Full MySQL schema
+css/style.css         # Questionnaire styling (participants only)
 ```
+
+## Recent Changes & Issues Fixed
+
+### Security Fixes (Jan 2026)
+- **Export endpoints secured**: `api/export-jsonl-hq.php` and `api/export-jsonl-universal.php` had NO authentication - now require admin session
+- **CORS headers removed**: Permissive `Access-Control-Allow-Origin: *` removed from export files
+
+### Apostrophe Escaping Fix
+- **Problem**: Escaped apostrophes (`\'`) in JS strings displayed as `d\` instead of `d'` in frontend
+- **Solution**: Converted single-quoted strings containing `\'` to double-quoted or backtick strings
+- **Files affected**: All `studies/*/questions.js` files + `database/schema.sql`
+- **Note**: PowerShell regex approach corrupted files - used Node.js parser instead
+
+### CSS Design Guidelines
+**IMPORTANT**: The questionnaire CSS must NOT look AI-generated. Follow these rules:
+
+1. **No gradients** - Use solid/flat colors only
+2. **Simple shadows** - Single layer, subtle (`0 1px 3px rgba(0,0,0,0.08)`)
+3. **No fancy animations** - Basic transitions only (`0.15s ease`)
+4. **No custom cubic-bezier** - Use standard `ease` timing
+5. **More spacing** - Adequate margins between buttons (12px+)
+6. **Simple border-radius** - Consistent 6px, not overly rounded
+7. **System fonts** - `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+
+The admin dashboard uses **Tailwind CSS** (CDN) - separate from `css/style.css`.
+
+## Local Development Notes
+
+- **No PHP locally**: Use `npx serve -p 3000` for static file testing
+- **API calls will fail**: PHP endpoints return raw source code with static server
+- **Test questionnaire UI only**: Navigation and styling work, but saves/loads don't
