@@ -1,51 +1,64 @@
 /**
  * ============================================================
- * QUESTIONNAIRE : ÉVALUATION & ENTRAÎNEMENT IA - EXPRESS
+ * QUESTIONNAIRE : ÉVALUATION & ENTRAÎNEMENT IA - EXPRESS v2.0
  * ============================================================
- * 
- * Objectif : Collecter des données de haute qualité pour 
+ *
+ * Objectif : Collecter des données de haute qualité pour
  * l'entraînement et l'alignement de modèles d'IA.
- * 
+ *
+ * OPTIMISÉ POUR LE MARCHÉ (cf. questionnaire-ia.md)
+ *
  * TYPE DE DONNÉES GÉNÉRÉES :
- * - Preference pairs (RLHF) : ~12 comparaisons
- * - Quality ratings : ~8 évaluations
- * - Human corrections : ~6 reformulations
- * - Safety labels : ~4 évaluations
+ * - Preference pairs (RLHF/DPO) : 10 comparaisons avec justification + confiance
+ * - Gold standard questions (IAA) : 2 questions pour mesurer l'accord inter-annotateurs
+ * - Quality ratings : 3 évaluations avec commentaires
+ * - Human corrections enrichies : 3 reformulations avec identification problème + confiance
+ * - Safety labels : 3 évaluations d'alignement
  * - Attention checks : 2 (contrôle qualité)
- * 
- * TOTAL : ~32 samples de haute qualité par participant
- * Durée estimée : 8-10 minutes
- * 
- * VALEUR COMMERCIALE :
- * - Compatible RLHF (Reinforcement Learning from Human Feedback)
+ *
+ * DONNÉES PAR PARTICIPANT :
+ * - 10 paires de préférences avec justification complète
+ * - 10 scores de confiance (préférences)
+ * - 2 gold standard pour calcul Cohen's Kappa
+ * - 3 corrections enrichies (problème identifié + confiance + use_original)
+ * - 3 évaluations safety
+ *
+ * TOTAL : ~55+ samples de haute qualité par participant
+ * Durée estimée : 12-15 minutes
+ *
+ * VALEUR COMMERCIALE ESTIMÉE : ~60€ de données/participant
+ * - Compatible RLHF/DPO (format avec justifications)
+ * - Mesure d'accord inter-annotateurs (IAA)
  * - Données d'alignement et de sécurité
- * - Corrections humaines pour fine-tuning
+ * - Corrections humaines enrichies pour fine-tuning
+ * - Français natif = premium (+50-100% vs traduction)
  */
 
 const STUDY_CONFIG = {
     studyId: 'EVAL_IA_EXPRESS_2026',
-    studyTitle: 'Évaluez des réponses d\'IA (10 min)',
+    studyTitle: 'Évaluez des réponses d\'IA (12-15 min)',
     studyDate: 'Janvier 2026',
     status: 'active',
-    
+
     anonymousMode: true,
     hideHoraires: true,
     enableBehaviorTracking: true,
-    
+
     welcomeMessage: `
         <h2>Aidez à améliorer les IA ! 🤖</h2>
-        <p>Ce questionnaire <strong>rapide (10 min)</strong> vous demande d'évaluer et comparer des réponses générées par des IA.</p>
+        <p>Ce questionnaire <strong>(12-15 min)</strong> vous demande d'évaluer et comparer des réponses générées par des IA.</p>
         <p>Votre avis humain est essentiel pour rendre les IA plus utiles et plus sûres.</p>
         <div style="background: #dbeafe; padding: 12px; border-radius: 8px; margin-top: 16px;">
             <strong>💡 Ce qu'on vous demande :</strong>
             <ul style="margin: 8px 0 0 0; padding-left: 20px;">
                 <li>Comparer deux réponses et choisir la meilleure</li>
+                <li>Expliquer vos choix en quelques mots</li>
                 <li>Noter la qualité de réponses</li>
                 <li>Corriger ou améliorer des textes</li>
             </ul>
         </div>
         <div style="background: #e0e7ff; padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 13px;">
-            <strong>🔒 Protection des données :</strong> Vos réponses sont anonymisées (RGPD). 
+            <strong>🔒 Protection des données :</strong> Vos réponses sont anonymisées (RGPD).
             Elles seront utilisées pour entraîner des modèles d'IA.
         </div>
     `,
@@ -143,10 +156,11 @@ const STUDY_CONFIG = {
         {
             id: 'pref_intro',
             type: 'info',
-            title: 'Partie 1/4 : Comparaisons (~3 min)',
+            title: 'Partie 1/4 : Comparaisons (~6 min)',
             text: `
                 <p>Comparez deux réponses d'IA à la même question.</p>
                 <p><strong>Choisissez celle que vous préférez</strong> - la plus utile, claire, et correcte.</p>
+                <p><em>Après chaque choix, expliquez brièvement pourquoi et indiquez votre niveau de confiance.</em></p>
             `
         },
 
@@ -178,12 +192,26 @@ const STUDY_CONFIG = {
         {
             id: 'pref_1_why',
             type: 'textarea',
-            title: 'En quelques mots, pourquoi ce choix ?',
+            title: 'Pourquoi ce choix ?',
             placeholder: 'Parce que...',
             required: true,
             minLength: 10,
             maxLength: 300,
             metadata: { type: 'preference_justification', parent: 'pref_1' }
+        },
+        {
+            id: 'pref_1_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_1' }
         },
 
         // Comparaison 2 : Conseil pratique
@@ -211,6 +239,30 @@ const STUDY_CONFIG = {
             ],
             metadata: { type: 'preference_pair', task: 'advice', topic: 'health', difficulty: 'practical' }
         },
+        {
+            id: 'pref_2_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            metadata: { type: 'preference_justification', parent: 'pref_2' }
+        },
+        {
+            id: 'pref_2_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_2' }
+        },
 
         // Comparaison 3 : Ton/style
         {
@@ -236,6 +288,30 @@ const STUDY_CONFIG = {
                 { value: 'egal', label: 'Les deux se valent' }
             ],
             metadata: { type: 'preference_pair', task: 'emotional_support', topic: 'failure', difficulty: 'empathy' }
+        },
+        {
+            id: 'pref_3_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            metadata: { type: 'preference_justification', parent: 'pref_3' }
+        },
+        {
+            id: 'pref_3_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_3' }
         },
 
         // ATTENTION CHECK 1
@@ -291,6 +367,30 @@ const STUDY_CONFIG = {
             ],
             metadata: { type: 'preference_pair', task: 'creative_writing', topic: 'scifi', difficulty: 'creative' }
         },
+        {
+            id: 'pref_4_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            metadata: { type: 'preference_justification', parent: 'pref_4' }
+        },
+        {
+            id: 'pref_4_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_4' }
+        },
 
         // Comparaison 5 : Code/technique
         {
@@ -318,6 +418,32 @@ const STUDY_CONFIG = {
             ],
             metadata: { type: 'preference_pair', task: 'technical', topic: 'css', difficulty: 'code' }
         },
+        {
+            id: 'pref_5_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            showIf: (responses) => responses['pref_5'] !== 'ne_sais_pas',
+            metadata: { type: 'preference_justification', parent: 'pref_5' }
+        },
+        {
+            id: 'pref_5_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            showIf: (responses) => responses['pref_5'] !== 'ne_sais_pas',
+            metadata: { type: 'preference_confidence', parent: 'pref_5' }
+        },
 
         // Comparaison 6 : Humour
         {
@@ -344,6 +470,292 @@ const STUDY_CONFIG = {
                 { value: 'aucune', label: 'Aucune ne me plaît' }
             ],
             metadata: { type: 'preference_pair', task: 'humor', topic: 'joke', difficulty: 'subjective' }
+        },
+        {
+            id: 'pref_6_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            showIf: (responses) => responses['pref_6'] !== 'aucune',
+            metadata: { type: 'preference_justification', parent: 'pref_6' }
+        },
+        {
+            id: 'pref_6_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            showIf: (responses) => responses['pref_6'] !== 'aucune',
+            metadata: { type: 'preference_confidence', parent: 'pref_6' }
+        },
+
+        // Comparaison 7 : Résumé/synthèse (NOUVEAU)
+        {
+            id: 'pref_7',
+            type: 'radio',
+            title: '📝 Question posée à l\'IA : "Résume-moi les avantages du télétravail"',
+            text: `
+                <div style="display: grid; gap: 16px; margin: 16px 0;">
+                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <strong>Réponse A :</strong><br>
+                        Le télétravail offre flexibilité horaire, économies (transport, repas), meilleur équilibre vie pro/perso, et souvent une productivité accrue. Il réduit aussi le stress des trajets et permet de travailler depuis n'importe où.
+                    </div>
+                    <div style="background: #dbeafe; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                        <strong>Réponse B :</strong><br>
+                        Le télétravail présente de multiples avantages : premièrement, la flexibilité géographique et temporelle ; deuxièmement, une réduction significative des coûts liés aux déplacements domicile-travail ; troisièmement, une amélioration potentielle de la qualité de vie ; quatrièmement, des gains de productivité documentés par plusieurs études ; cinquièmement, une réduction de l'empreinte carbone collective.
+                    </div>
+                </div>
+            `,
+            required: true,
+            options: [
+                { value: 'A', label: 'Je préfère la Réponse A' },
+                { value: 'B', label: 'Je préfère la Réponse B' },
+                { value: 'egal', label: 'Les deux se valent' }
+            ],
+            metadata: { type: 'preference_pair', task: 'summary', topic: 'work', difficulty: 'synthesis' }
+        },
+        {
+            id: 'pref_7_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            metadata: { type: 'preference_justification', parent: 'pref_7' }
+        },
+        {
+            id: 'pref_7_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_7' }
+        },
+
+        // Comparaison 8 : Argumentation (NOUVEAU)
+        {
+            id: 'pref_8',
+            type: 'radio',
+            title: '📝 Question posée à l\'IA : "Convaincs-moi de faire du sport régulièrement"',
+            text: `
+                <div style="display: grid; gap: 16px; margin: 16px 0;">
+                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <strong>Réponse A :</strong><br>
+                        Écoute, 30 minutes de marche 3 fois par semaine, c'est tout ce qu'il faut pour commencer à voir des changements : tu dormiras mieux dès la première semaine, tu auras plus d'énergie, et ton humeur sera meilleure. Pas besoin de marathon, juste bouger un peu. Et honnêtement, qu'est-ce que tu perds à essayer pendant un mois ?
+                    </div>
+                    <div style="background: #dbeafe; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                        <strong>Réponse B :</strong><br>
+                        Les bienfaits du sport sont scientifiquement prouvés : réduction de 35% des risques cardiovasculaires, amélioration cognitive, régulation hormonale, renforcement immunitaire. L'OMS recommande 150 minutes d'activité modérée par semaine. L'investissement temps est minimal comparé aux bénéfices long terme.
+                    </div>
+                </div>
+            `,
+            required: true,
+            options: [
+                { value: 'A', label: 'Je préfère la Réponse A' },
+                { value: 'B', label: 'Je préfère la Réponse B' },
+                { value: 'egal', label: 'Les deux se valent' }
+            ],
+            metadata: { type: 'preference_pair', task: 'argumentation', topic: 'health', difficulty: 'persuasion' }
+        },
+        {
+            id: 'pref_8_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            metadata: { type: 'preference_justification', parent: 'pref_8' }
+        },
+        {
+            id: 'pref_8_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_8' }
+        },
+
+        // Comparaison 9 : Instructions step-by-step (NOUVEAU)
+        {
+            id: 'pref_9',
+            type: 'radio',
+            title: '📝 Question posée à l\'IA : "Comment changer un pneu de voiture ?"',
+            text: `
+                <div style="display: grid; gap: 16px; margin: 16px 0;">
+                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <strong>Réponse A :</strong><br>
+                        1. Garez-vous sur du plat et serrez le frein à main<br>
+                        2. Sortez le cric et la roue de secours<br>
+                        3. Desserrez légèrement les boulons (sans les enlever)<br>
+                        4. Placez le cric sous le point de levage et montez la voiture<br>
+                        5. Enlevez les boulons puis le pneu crevé<br>
+                        6. Mettez la roue de secours, revissez à la main<br>
+                        7. Descendez la voiture et serrez les boulons en croix
+                    </div>
+                    <div style="background: #dbeafe; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                        <strong>Réponse B :</strong><br>
+                        Pour changer un pneu, vous aurez besoin d'un cric, d'une clé en croix et d'une roue de secours. Assurez-vous d'être en sécurité sur le bord de la route. Le processus implique de soulever le véhicule, de retirer les écrous, de remplacer la roue et de resserrer. N'oubliez pas de faire vérifier votre pneu de secours chez un professionnel ensuite.
+                    </div>
+                </div>
+            `,
+            required: true,
+            options: [
+                { value: 'A', label: 'Je préfère la Réponse A' },
+                { value: 'B', label: 'Je préfère la Réponse B' },
+                { value: 'egal', label: 'Les deux se valent' }
+            ],
+            metadata: { type: 'preference_pair', task: 'step_by_step', topic: 'practical', difficulty: 'instruction' }
+        },
+        {
+            id: 'pref_9_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            metadata: { type: 'preference_justification', parent: 'pref_9' }
+        },
+        {
+            id: 'pref_9_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_9' }
+        },
+
+        // Comparaison 10 : Question factuelle (NOUVEAU)
+        {
+            id: 'pref_10',
+            type: 'radio',
+            title: '📝 Question posée à l\'IA : "Qui a inventé l\'ampoule électrique ?"',
+            text: `
+                <div style="display: grid; gap: 16px; margin: 16px 0;">
+                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <strong>Réponse A :</strong><br>
+                        Thomas Edison a breveté l'ampoule à incandescence commercialement viable en 1879. Mais il n'était pas le seul : Joseph Swan en Angleterre travaillait en parallèle, et des inventeurs comme Humphry Davy avaient déjà créé des formes d'éclairage électrique avant. Edison a surtout rendu l'ampoule pratique et abordable.
+                    </div>
+                    <div style="background: #dbeafe; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                        <strong>Réponse B :</strong><br>
+                        Thomas Edison a inventé l'ampoule électrique en 1879.
+                    </div>
+                </div>
+            `,
+            required: true,
+            options: [
+                { value: 'A', label: 'Je préfère la Réponse A' },
+                { value: 'B', label: 'Je préfère la Réponse B' },
+                { value: 'egal', label: 'Les deux se valent' }
+            ],
+            metadata: { type: 'preference_pair', task: 'factual', topic: 'history', difficulty: 'knowledge' }
+        },
+        {
+            id: 'pref_10_why',
+            type: 'textarea',
+            title: 'Pourquoi ce choix ?',
+            placeholder: 'Parce que...',
+            required: true,
+            minLength: 10,
+            maxLength: 300,
+            metadata: { type: 'preference_justification', parent: 'pref_10' }
+        },
+        {
+            id: 'pref_10_confidence',
+            type: 'radio',
+            title: 'À quel point êtes-vous sûr(e) de votre choix ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas du tout sûr' },
+                { value: '2', label: '2 - Peu sûr' },
+                { value: '3', label: '3 - Moyennement sûr' },
+                { value: '4', label: '4 - Assez sûr' },
+                { value: '5', label: '5 - Très sûr' }
+            ],
+            metadata: { type: 'preference_confidence', parent: 'pref_10' }
+        },
+
+        // ============================================================
+        // GOLD STANDARD QUESTIONS (IAA - Inter-Annotator Agreement)
+        // ============================================================
+        // Ces questions ont une réponse attendue connue pour mesurer la fiabilité des annotateurs
+
+        {
+            id: 'gold_1',
+            type: 'radio',
+            title: '📝 Question posée à l\'IA : "Comment calculer 15% de 200 ?"',
+            text: `
+                <div style="display: grid; gap: 16px; margin: 16px 0;">
+                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <strong>Réponse A :</strong><br>
+                        15% de 200 = 0,15 × 200 = 30. Donc 15% de 200, c'est 30.
+                    </div>
+                    <div style="background: #dbeafe; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                        <strong>Réponse B :</strong><br>
+                        Pour calculer 15% de 200, il faut diviser 200 par 15, ce qui donne environ 13,33.
+                    </div>
+                </div>
+            `,
+            required: true,
+            options: [
+                { value: 'A', label: 'Je préfère la Réponse A' },
+                { value: 'B', label: 'Je préfère la Réponse B' },
+                { value: 'egal', label: 'Les deux se valent' }
+            ],
+            metadata: { type: 'gold_standard', expected: 'A', reason: 'A est mathématiquement correcte (30), B est fausse (calcul erroné)' }
+        },
+        {
+            id: 'gold_2',
+            type: 'radio',
+            title: '📝 Question posée à l\'IA : "Donne-moi une recette simple de pâtes"',
+            text: `
+                <div style="display: grid; gap: 16px; margin: 16px 0;">
+                    <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <strong>Réponse A :</strong><br>
+                        Fais bouillir de l'eau salée, ajoute les pâtes et cuis selon le temps indiqué sur le paquet. Égoutte et ajoute du beurre ou de l'huile d'olive, du parmesan et du poivre. Simple et efficace !
+                    </div>
+                    <div style="background: #dbeafe; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                        <strong>Réponse B :</strong><br>
+                        La préparation des pâtes nécessite une compréhension approfondie des techniques culinaires italiennes traditionnelles, impliquant une sélection minutieuse des ingrédients, une maîtrise de la température de cuisson et une connaissance des différentes sauces régionales authentiques.
+                    </div>
+                </div>
+            `,
+            required: true,
+            options: [
+                { value: 'A', label: 'Je préfère la Réponse A' },
+                { value: 'B', label: 'Je préfère la Réponse B' },
+                { value: 'egal', label: 'Les deux se valent' }
+            ],
+            metadata: { type: 'gold_standard', expected: 'A', reason: 'A répond directement à la demande (recette simple), B ne donne pas de recette' }
         },
 
         // ============================================================
@@ -453,74 +865,197 @@ const STUDY_CONFIG = {
         {
             id: 'correction_intro',
             type: 'info',
-            title: 'Partie 3/4 : Corrections (~3 min)',
+            title: 'Partie 3/4 : Corrections (~4 min)',
             text: `
-                <p>Ces réponses d'IA ont des <strong>problèmes</strong>. Corrigez-les ou améliorez-les.</p>
-                <p>Écrivez comme <strong>vous</strong> auriez répondu.</p>
+                <p>Ces réponses d'IA ont des <strong>problèmes</strong>.</p>
+                <p>Pour chaque réponse : <strong>1)</strong> Identifiez le(s) problème(s), <strong>2)</strong> Réécrivez-la comme vous l'auriez fait.</p>
             `
         },
 
         // Correction 1 : Trop formel
         {
-            id: 'correct_1',
-            type: 'textarea',
-            title: '✏️ Cette réponse est trop formelle. Réécrivez-la de façon plus naturelle.',
+            id: 'correct_1_problem',
+            type: 'multiple',
+            title: '🔍 Quel(s) problème(s) identifiez-vous dans cette réponse ?',
             text: `
                 <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
                     <strong>Question :</strong> "Tu connais un bon resto à Paris ?"
                 </div>
                 <div style="background: #fee2e2; padding: 16px; border-radius: 8px; border-left: 4px solid #ef4444;">
-                    <strong>Réponse de l'IA (à améliorer) :</strong><br>
+                    <strong>Réponse de l'IA :</strong><br>
                     Je vous recommande vivement l'établissement gastronomique "Le Comptoir" situé dans le 6ème arrondissement de Paris. Cet établissement propose une cuisine française raffinée dans un cadre élégant. Je vous conseille de procéder à une réservation préalable.
                 </div>
             `,
+            required: true,
+            minRequired: 1,
+            options: [
+                { value: 'trop_formel', label: 'Trop formel / guindé' },
+                { value: 'trop_vague', label: 'Trop vague / peu utile' },
+                { value: 'ton_inapproprie', label: 'Ton inapproprié pour le contexte' },
+                { value: 'trop_long', label: 'Trop long / verbeux' },
+                { value: 'inexact', label: 'Informations potentiellement inexactes' },
+                { value: 'autre', label: 'Autre problème' }
+            ],
+            metadata: { type: 'problem_identification', parent: 'correct_1' }
+        },
+        {
+            id: 'correct_1',
+            type: 'textarea',
+            title: '✏️ Réécrivez cette réponse de façon plus naturelle.',
             placeholder: 'Ouais, je te conseille...',
             required: true,
             minLength: 30,
             maxLength: 500,
             metadata: { type: 'human_correction', issue: 'too_formal', task: 'recommendation' }
         },
+        {
+            id: 'correct_1_confidence',
+            type: 'radio',
+            title: 'Quelle confiance avez-vous dans votre correction ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas confiant' },
+                { value: '2', label: '2 - Peu confiant' },
+                { value: '3', label: '3 - Moyennement confiant' },
+                { value: '4', label: '4 - Assez confiant' },
+                { value: '5', label: '5 - Très confiant' }
+            ],
+            metadata: { type: 'correction_confidence', parent: 'correct_1' }
+        },
+        {
+            id: 'correct_1_use_original',
+            type: 'radio',
+            title: 'Utiliseriez-vous la réponse originale telle quelle ?',
+            required: true,
+            options: [
+                { value: 'oui', label: 'Oui, elle convient' },
+                { value: 'non', label: 'Non, elle nécessite des modifications' }
+            ],
+            metadata: { type: 'use_original', parent: 'correct_1' }
+        },
 
         // Correction 2 : Trop vague
         {
-            id: 'correct_2',
-            type: 'textarea',
-            title: '✏️ Cette réponse est trop vague. Donnez une réponse plus concrète et utile.',
+            id: 'correct_2_problem',
+            type: 'multiple',
+            title: '🔍 Quel(s) problème(s) identifiez-vous dans cette réponse ?',
             text: `
                 <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
                     <strong>Question :</strong> "Comment négocier le prix d'une voiture d'occasion ?"
                 </div>
                 <div style="background: #fee2e2; padding: 16px; border-radius: 8px; border-left: 4px solid #ef4444;">
-                    <strong>Réponse de l'IA (à améliorer) :</strong><br>
+                    <strong>Réponse de l'IA :</strong><br>
                     Pour négocier une voiture d'occasion, il faut bien se préparer, connaître le marché, être confiant mais respectueux, et ne pas hésiter à faire des contre-propositions.
                 </div>
             `,
+            required: true,
+            minRequired: 1,
+            options: [
+                { value: 'trop_formel', label: 'Trop formel / guindé' },
+                { value: 'trop_vague', label: 'Trop vague / peu utile' },
+                { value: 'manque_exemples', label: 'Manque d\'exemples concrets' },
+                { value: 'trop_generique', label: 'Trop générique / banal' },
+                { value: 'incomplet', label: 'Réponse incomplète' },
+                { value: 'autre', label: 'Autre problème' }
+            ],
+            metadata: { type: 'problem_identification', parent: 'correct_2' }
+        },
+        {
+            id: 'correct_2',
+            type: 'textarea',
+            title: '✏️ Donnez une réponse plus concrète et utile.',
             placeholder: 'Concrètement, voici ce que je ferais...',
             required: true,
             minLength: 50,
             maxLength: 600,
             metadata: { type: 'human_correction', issue: 'too_vague', task: 'advice' }
         },
+        {
+            id: 'correct_2_confidence',
+            type: 'radio',
+            title: 'Quelle confiance avez-vous dans votre correction ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas confiant' },
+                { value: '2', label: '2 - Peu confiant' },
+                { value: '3', label: '3 - Moyennement confiant' },
+                { value: '4', label: '4 - Assez confiant' },
+                { value: '5', label: '5 - Très confiant' }
+            ],
+            metadata: { type: 'correction_confidence', parent: 'correct_2' }
+        },
+        {
+            id: 'correct_2_use_original',
+            type: 'radio',
+            title: 'Utiliseriez-vous la réponse originale telle quelle ?',
+            required: true,
+            options: [
+                { value: 'oui', label: 'Oui, elle convient' },
+                { value: 'non', label: 'Non, elle nécessite des modifications' }
+            ],
+            metadata: { type: 'use_original', parent: 'correct_2' }
+        },
 
         // Correction 3 : Ton inapproprié
         {
-            id: 'correct_3',
-            type: 'textarea',
-            title: '✏️ Le ton est inapproprié pour la situation. Réécrivez avec plus d\'empathie.',
+            id: 'correct_3_problem',
+            type: 'multiple',
+            title: '🔍 Quel(s) problème(s) identifiez-vous dans cette réponse ?',
             text: `
                 <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
                     <strong>Question :</strong> "Mon chien est mort hier, je suis vraiment triste"
                 </div>
                 <div style="background: #fee2e2; padding: 16px; border-radius: 8px; border-left: 4px solid #ef4444;">
-                    <strong>Réponse de l'IA (à améliorer) :</strong><br>
+                    <strong>Réponse de l'IA :</strong><br>
                     Je suis désolé pour votre perte. Voici quelques conseils pour faire votre deuil : 1) Acceptez vos émotions 2) Parlez-en à vos proches 3) Considérez un nouveau animal de compagnie quand vous serez prêt 4) Consultez un professionnel si nécessaire.
                 </div>
             `,
+            required: true,
+            minRequired: 1,
+            options: [
+                { value: 'manque_empathie', label: 'Manque d\'empathie / trop froid' },
+                { value: 'trop_prescriptif', label: 'Trop prescriptif / liste de conseils inappropriée' },
+                { value: 'insensible', label: 'Insensible au contexte émotionnel' },
+                { value: 'trop_rapide', label: 'Passe trop vite aux solutions' },
+                { value: 'suggestion_deplacee', label: 'Suggestion déplacée (nouvel animal)' },
+                { value: 'autre', label: 'Autre problème' }
+            ],
+            metadata: { type: 'problem_identification', parent: 'correct_3' }
+        },
+        {
+            id: 'correct_3',
+            type: 'textarea',
+            title: '✏️ Réécrivez avec plus d\'empathie.',
             placeholder: 'Je suis vraiment désolé...',
             required: true,
             minLength: 40,
             maxLength: 500,
             metadata: { type: 'human_correction', issue: 'wrong_tone', task: 'emotional_support' }
+        },
+        {
+            id: 'correct_3_confidence',
+            type: 'radio',
+            title: 'Quelle confiance avez-vous dans votre correction ?',
+            required: true,
+            options: [
+                { value: '1', label: '1 - Pas confiant' },
+                { value: '2', label: '2 - Peu confiant' },
+                { value: '3', label: '3 - Moyennement confiant' },
+                { value: '4', label: '4 - Assez confiant' },
+                { value: '5', label: '5 - Très confiant' }
+            ],
+            metadata: { type: 'correction_confidence', parent: 'correct_3' }
+        },
+        {
+            id: 'correct_3_use_original',
+            type: 'radio',
+            title: 'Utiliseriez-vous la réponse originale telle quelle ?',
+            required: true,
+            options: [
+                { value: 'oui', label: 'Oui, elle convient' },
+                { value: 'non', label: 'Non, elle nécessite des modifications' }
+            ],
+            metadata: { type: 'use_original', parent: 'correct_3' }
         },
 
         // ATTENTION CHECK 2
@@ -658,7 +1193,7 @@ const STUDY_CONFIG = {
             required: true,
             options: [
                 { value: 'trop_court', label: 'Trop court' },
-                { value: 'bien', label: 'Bien, environ 10 min comme annoncé' },
+                { value: 'bien', label: 'Bien, environ 12-15 min comme annoncé' },
                 { value: 'un_peu_long', label: 'Un peu long' },
                 { value: 'trop_long', label: 'Trop long' }
             ],

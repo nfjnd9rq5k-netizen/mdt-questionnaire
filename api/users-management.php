@@ -17,6 +17,7 @@ try {
 session_start();
 require_once 'config.php';
 require_once 'db.php';
+require_once 'security.php';
 
 header('Content-Type: application/json');
 
@@ -193,6 +194,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 $currentRole = $_SESSION['user_role'] ?? 'user';
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+// Actions qui modifient des données = vérification CSRF obligatoire
+$actionsRequiringCsrf = ['create', 'update', 'delete'];
+
+if (in_array($action, $actionsRequiringCsrf)) {
+    $csrfToken = $_POST['csrf_token'] ?? $_GET['csrf_token'] ?? null;
+    if (!validateCsrfToken($csrfToken)) {
+        echo json_encode([
+            'success' => false,
+            'error' => 'Token CSRF invalide. Veuillez rafraîchir la page.'
+        ]);
+        exit;
+    }
+}
 
 switch ($action) {
     case 'list':

@@ -16,15 +16,11 @@
  */
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
 
-// Requête OPTIONS (pré-vérification CORS)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
+// Sécurité CORS - Charger la configuration
+require_once __DIR__ . '/security.php';
+applyCorsHeaders();
+handleCorsPreflightIfNeeded();
 
 // Connexion à la base de données
 require_once 'db.php';

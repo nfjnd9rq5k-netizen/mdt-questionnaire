@@ -6,6 +6,7 @@ header("Expires: 0");
 session_start();
 require_once '../api/config.php';
 require_once '../api/db.php';
+require_once '../api/security.php';
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: index.php');
@@ -48,6 +49,7 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?= csrfMeta() ?>
     <title>Administration MDT</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -337,6 +339,32 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
         let isEditMode = false;
         const userRole = '<?= $adminRole ?>';
         const canEdit = (userRole === 'super_admin');
+
+        // Récupère le token CSRF depuis la balise meta
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            return meta ? meta.getAttribute('content') : '';
+        }
+
+        // Fonction utilitaire pour les requêtes POST sécurisées avec CSRF (JSON)
+        async function securePost(url, data) {
+            data.csrf_token = getCsrfToken();
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        }
+
+        // Fonction utilitaire pour les requêtes POST form sécurisées avec CSRF
+        async function securePostForm(url, formBody) {
+            formBody += '&csrf_token=' + encodeURIComponent(getCsrfToken());
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formBody
+            });
+        }
 
         function toggleMobileMenu() {
             document.getElementById('sidebar').classList.toggle('open');
@@ -1252,7 +1280,7 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             document.querySelectorAll('.edit-sig').forEach(inp => updatedSig[inp.dataset.field] = inp.value);
             document.querySelectorAll('.edit-response').forEach(inp => { const qId = inp.dataset.qid, nv = inp.value.trim(); if (updatedReponses[qId]) { if (updatedReponses[qId].value !== undefined) updatedReponses[qId].value = nv; else if (updatedReponses[qId].values && Array.isArray(updatedReponses[qId].values)) updatedReponses[qId].values = nv.split(',').map(v => v.trim()); } });
             try {
-                const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_participant', studyId: currentEditData.studyId, participantId: currentEditData.participantId, type: currentEditData.type, signaletics: updatedSig, reponses: updatedReponses }) });
+                const res = await securePost('../api/admin-data.php', { action: 'update_participant', studyId: currentEditData.studyId, participantId: currentEditData.participantId, type: currentEditData.type, signaletics: updatedSig, reponses: updatedReponses });
                 const data = await res.json();
                 if (data.success) { closeModal(); loadData(); } else alert('Erreur: ' + (data.error || 'Échec'));
             } catch (e) { alert('Erreur de connexion'); }
@@ -1379,8 +1407,8 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             } catch (e) { listEl.innerHTML = '<p class="text-red-500 text-sm text-center py-2">Erreur de chargement</p>'; }
         }
 
-        async function addAccessIds(folder) { const input = document.getElementById('new-access-ids-' + folder), newIds = input.value.split(/[,\n]+/).map(id => id.trim()).filter(id => id); if (newIds.length === 0) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_access_ids', studyFolder: folder, ids: newIds }) }); const data = await res.json(); if (data.success) { input.value = ''; loadAccessIds(folder); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
-        async function removeAccessId(folder, id) { if (!confirm('Supprimer l\'ID "' + id + '" ?')) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_access_id', studyFolder: folder, accessCode: id }) }); const data = await res.json(); if (data.success) { loadAccessIds(folder); showToast('✓ ID supprimé'); } else { alert('Erreur: ' + (data.error || 'Échec')); } } catch (e) { alert('Erreur de connexion'); } }
+        async function addAccessIds(folder) { const input = document.getElementById('new-access-ids-' + folder), newIds = input.value.split(/[,\n]+/).map(id => id.trim()).filter(id => id); if (newIds.length === 0) return; try { const res = await securePost('../api/admin-data.php', { action: 'add_access_ids', studyFolder: folder, ids: newIds }); const data = await res.json(); if (data.success) { input.value = ''; loadAccessIds(folder); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function removeAccessId(folder, id) { if (!confirm('Supprimer l\'ID "' + id + '" ?')) return; try { const res = await securePost('../api/admin-data.php', { action: 'delete_access_id', studyFolder: folder, accessCode: id }); const data = await res.json(); if (data.success) { loadAccessIds(folder); showToast('✓ ID supprimé'); } else { alert('Erreur: ' + (data.error || 'Échec')); } } catch (e) { alert('Erreur de connexion'); } }
         async function closeStudy(folder) { if (!confirm('Terminer cette étude ? Elle sera archivée.')) return; try { const res = await fetch('../api/study-status.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: folder, status: 'closed' }) }); const data = await res.json(); if (data.success) { loadData(); switchTab('closed'); } else { alert('Erreur: ' + (data.error || 'Échec')); } } catch (e) { alert('Erreur de connexion'); } }
         async function reopenStudy(folder) { if (!confirm('Réouvrir cette étude ?')) return; try { const res = await fetch('../api/study-status.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: folder, status: 'active' }) }); const data = await res.json(); if (data.success) { loadData(); switchTab('studies'); } else { alert('Erreur: ' + (data.error || 'Échec')); } } catch (e) { alert('Erreur de connexion'); } }
         async function deleteStudy(folder, studyName) { 
@@ -1394,8 +1422,8 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
                 else { alert('Erreur: ' + (data.error || 'Échec de la suppression')); } 
             } catch (e) { alert('Erreur de connexion'); } 
         }
-        async function deleteParticipant(studyId, participantId, type) { if (!confirm('Supprimer ce participant ?')) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_participant', studyId, participantId, type }) }); const data = await res.json(); if (data.success) loadData(); } catch (e) { alert('Erreur'); } }
-        async function moveToQualified(studyId, participantId) { if (!confirm('Déplacer ce participant vers les qualifiés ?')) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move_to_qualified', studyId, participantId }) }); const data = await res.json(); if (data.success) loadData(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur'); } }
+        async function deleteParticipant(studyId, participantId, type) { if (!confirm('Supprimer ce participant ?')) return; try { const res = await securePost('../api/admin-data.php', { action: 'delete_participant', studyId, participantId, type }); const data = await res.json(); if (data.success) loadData(); } catch (e) { alert('Erreur'); } }
+        async function moveToQualified(studyId, participantId) { if (!confirm('Déplacer ce participant vers les qualifiés ?')) return; try { const res = await securePost('../api/admin-data.php', { action: 'move_to_qualified', studyId, participantId }); const data = await res.json(); if (data.success) loadData(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur'); } }
 
         let previewQuestions = [], previewIndex = 0;
         async function previewStudy(folder) {
@@ -1583,14 +1611,14 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             errorEl.classList.add('hidden');
             document.getElementById('new-password-confirm').classList.remove('border-red-400');
             
-            try { 
-                const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=create&username=${encodeURIComponent(un)}&password=${encodeURIComponent(pw)}&display_name=${encodeURIComponent(dn)}&role=${encodeURIComponent(role)}` }); 
-                const data = await res.json(); 
-                if (data.success) { closeModal(); loadAccounts(); showToast('✓ Compte créé !'); } 
-                else alert('Erreur: ' + (data.error || 'Échec')); 
-            } catch (e) { 
+            try {
+                const res = await securePostForm('../api/users-management.php', `action=create&username=${encodeURIComponent(un)}&password=${encodeURIComponent(pw)}&display_name=${encodeURIComponent(dn)}&role=${encodeURIComponent(role)}`);
+                const data = await res.json();
+                if (data.success) { closeModal(); loadAccounts(); showToast('✓ Compte créé !'); }
+                else alert('Erreur: ' + (data.error || 'Échec'));
+            } catch (e) {
                 console.error('Erreur création compte:', e);
-                alert('Erreur de connexion au serveur'); 
+                alert('Erreur de connexion au serveur');
             } 
         }
         function showEditUserModal(userId) { 
@@ -1617,12 +1645,12 @@ $canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' |
             document.getElementById('modal-footer').innerHTML = `<button onclick="closeModal()" class="px-4 py-2 text-sm btn-secondary rounded-lg">Annuler</button><button onclick="updateUser('${userId}')" class="px-4 py-2 text-sm btn-primary rounded-lg">Enregistrer</button>`; 
             openModal(); 
         }
-        async function updateUser(userId) { const dn = document.getElementById('edit-display-name').value.trim(), pw = document.getElementById('edit-password').value; if (!dn) { alert('Le nom d\'affichage est requis'); return; } if (pw && pw.length < 6) { alert('Le mot de passe doit faire au moins 6 caractères'); return; } let body = `action=update&user_id=${encodeURIComponent(userId)}&display_name=${encodeURIComponent(dn)}`; if (pw) body += `&password=${encodeURIComponent(pw)}`; try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body }); const data = await res.json(); if (data.success) { closeModal(); loadAccounts(); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
-        async function changeUserRole(userId, newRole) { try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=update&user_id=${encodeURIComponent(userId)}&role=${encodeURIComponent(newRole)}` }); const data = await res.json(); if (data.success) loadAccounts(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
-        async function deleteUser(userId, displayName) { if (!confirm(`Supprimer le compte "${displayName}" ?`)) return; try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=delete&user_id=${encodeURIComponent(userId)}` }); const data = await res.json(); if (data.success) loadAccounts(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function updateUser(userId) { const dn = document.getElementById('edit-display-name').value.trim(), pw = document.getElementById('edit-password').value; if (!dn) { alert('Le nom d\'affichage est requis'); return; } if (pw && pw.length < 6) { alert('Le mot de passe doit faire au moins 6 caractères'); return; } let body = `action=update&user_id=${encodeURIComponent(userId)}&display_name=${encodeURIComponent(dn)}`; if (pw) body += `&password=${encodeURIComponent(pw)}`; try { const res = await securePostForm('../api/users-management.php', body); const data = await res.json(); if (data.success) { closeModal(); loadAccounts(); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function changeUserRole(userId, newRole) { try { const res = await securePostForm('../api/users-management.php', `action=update&user_id=${encodeURIComponent(userId)}&role=${encodeURIComponent(newRole)}`); const data = await res.json(); if (data.success) loadAccounts(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function deleteUser(userId, displayName) { if (!confirm(`Supprimer le compte "${displayName}" ?`)) return; try { const res = await securePostForm('../api/users-management.php', `action=delete&user_id=${encodeURIComponent(userId)}`); const data = await res.json(); if (data.success) loadAccounts(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
         function showStudiesModal(userId, displayName) { const user = usersData.find(u => u.id === userId); if (!user) return; const us = user.allowed_studies || [], hasAll = us.includes('*'); let studiesHtml = `<div class="mb-4"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="all-studies" ${hasAll ? 'checked' : ''} onchange="toggleAllStudies(this)" class="w-4 h-4 rounded border-gray-300"><span class="font-medium">Toutes les études (actuelles et futures)</span></label></div><div id="studies-list" class="${hasAll ? 'opacity-50 pointer-events-none' : ''}"><p class="text-sm text-gray-500 mb-2">Ou sélectionnez des études spécifiques :</p><div class="space-y-2 max-h-64 overflow-y-auto">`; studiesList.forEach(s => { const isChecked = hasAll || us.includes(s.id); studiesHtml += `<label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"><input type="checkbox" class="study-checkbox w-4 h-4 rounded border-gray-300" value="${esc(s.id)}" ${isChecked ? 'checked' : ''}><span>${esc(s.name)}</span><span class="text-xs text-gray-400">(${s.status})</span></label>`; }); studiesHtml += `</div></div>`; document.getElementById('modal-title').textContent = `Études autorisées - ${displayName}`; document.getElementById('modal-body').innerHTML = studiesHtml; document.getElementById('modal-footer').classList.remove('hidden'); document.getElementById('modal-footer').innerHTML = `<button onclick="closeModal()" class="px-4 py-2 text-sm btn-secondary rounded-lg">Annuler</button><button onclick="saveUserStudies('${userId}')" class="px-4 py-2 text-sm btn-primary rounded-lg">Enregistrer</button>`; openModal(); }
         function toggleAllStudies(checkbox) { const list = document.getElementById('studies-list'); if (checkbox.checked) list.classList.add('opacity-50', 'pointer-events-none'); else list.classList.remove('opacity-50', 'pointer-events-none'); }
-        async function saveUserStudies(userId) { const allStudies = document.getElementById('all-studies').checked; let studies = []; if (allStudies) studies = ['*']; else document.querySelectorAll('.study-checkbox:checked').forEach(cb => studies.push(cb.value)); try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=update&user_id=${encodeURIComponent(userId)}&allowed_studies=${encodeURIComponent(JSON.stringify(studies))}` }); const data = await res.json(); if (data.success) { closeModal(); loadAccounts(); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function saveUserStudies(userId) { const allStudies = document.getElementById('all-studies').checked; let studies = []; if (allStudies) studies = ['*']; else document.querySelectorAll('.study-checkbox:checked').forEach(cb => studies.push(cb.value)); try { const res = await securePostForm('../api/users-management.php', `action=update&user_id=${encodeURIComponent(userId)}&allowed_studies=${encodeURIComponent(JSON.stringify(studies))}`); const data = await res.json(); if (data.success) { closeModal(); loadAccounts(); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
 
         document.getElementById('preview-modal').addEventListener('click', e => { if (e.target.id === 'preview-modal') closePreview(); });
         document.getElementById('responses-modal').addEventListener('click', e => { if (e.target.id === 'responses-modal') closeModal(); });

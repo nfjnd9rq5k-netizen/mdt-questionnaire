@@ -10,6 +10,7 @@ session_start();
 header('Content-Type: application/json');
 
 require_once 'db.php';
+require_once 'security.php';
 
 define('SESSION_TIMEOUT', 3600);
 
@@ -39,6 +40,27 @@ $_SESSION['last_activity'] = time();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $action = $input['action'] ?? '';
+
+    // Actions qui modifient des données = vérification CSRF obligatoire
+    $actionsRequiringCsrf = [
+        'delete_participant',
+        'update_participant',
+        'update_responses',
+        'add_access_ids',
+        'delete_access_id',
+        'move_to_qualified'
+    ];
+
+    if (in_array($action, $actionsRequiringCsrf)) {
+        $csrfToken = $input['csrf_token'] ?? null;
+        if (!validateCsrfToken($csrfToken)) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Token CSRF invalide. Veuillez rafraîchir la page.'
+            ]);
+            exit;
+        }
+    }
     
     if ($action === 'delete_participant') {
         $participantId = $input['participantId'] ?? '';
