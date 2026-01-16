@@ -14,10 +14,18 @@
  *   - include_context=1 : inclure le contexte des questions (défaut: 1)
  */
 
-header('Content-Type: application/jsonl; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-
+session_start();
 require_once 'db.php';
+
+// Vérification authentification
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    http_response_code(401);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Non autorisé - Authentification requise']);
+    exit;
+}
+
+header('Content-Type: application/jsonl; charset=utf-8');
 
 $studyId = $_GET['study'] ?? 'DATA_IA_JAN2026';
 $minQuality = intval($_GET['min_quality'] ?? 0);

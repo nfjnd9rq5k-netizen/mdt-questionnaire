@@ -16,10 +16,18 @@
  * USAGE: /api/export-jsonl-universal.php?study=EVAL_IA_EXPRESS_2026
  */
 
-header('Content-Type: application/jsonl; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-
+session_start();
 require_once 'db.php';
+
+// Vérification authentification
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    http_response_code(401);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Non autorisé - Authentification requise']);
+    exit;
+}
+
+header('Content-Type: application/jsonl; charset=utf-8');
 
 $studyId = $_GET['study'] ?? '';
 
