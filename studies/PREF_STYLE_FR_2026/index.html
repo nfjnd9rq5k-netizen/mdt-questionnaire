@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Questionnaire - Préférences de style</title>
+    <link rel="stylesheet" href="../../css/style.css?v=81">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Styles pour les comparaisons A/B */
+        .comparison-scenario {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3b82f6;
+        }
+        .comparison-scenario blockquote {
+            background: #e2e8f0;
+            padding: 12px 16px;
+            border-left: 4px solid #64748b;
+            margin: 12px 0 0 0;
+            border-radius: 0 8px 8px 0;
+            font-style: italic;
+        }
+        .response-option {
+            background: #fff;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 8px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .response-option h4 {
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+            font-size: 1rem;
+        }
+        .response-a h4 { color: #3b82f6; border-color: #3b82f6; }
+        .response-b h4 { color: #8b5cf6; border-color: #8b5cf6; }
+        .response-option p {
+            margin: 8px 0;
+            color: #475569;
+        }
+        .response-option ul, .response-option ol {
+            margin: 8px 0;
+            padding-left: 20px;
+            color: #475569;
+        }
+        .response-option li {
+            margin: 4px 0;
+        }
+        .response-option strong {
+            color: #1e293b;
+        }
+        .response-option em {
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Chargement du questionnaire...</p>
+        </div>
+    </div>
+    
+    <script src="../../js/engine.js?v=81"></script>
+    <script src="questions.js?v=81"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('status.json?v=' + Date.now());
+                const status = await response.json();
+                
+                if (status.status === 'closed') {
+                    window.location.href = '../closed.html';
+                    return;
+                }
+                
+                const questionnaire = new QuestionnaireEngine(STUDY_CONFIG);
+                questionnaire.init();
+            } catch (error) {
+                const questionnaire = new QuestionnaireEngine(STUDY_CONFIG);
+                questionnaire.init();
+            }
+        });
+    </script>
+</body>
+</html>

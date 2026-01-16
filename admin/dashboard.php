@@ -5,11 +5,19 @@ header("Pragma: no-cache");
 header("Expires: 0");
 session_start();
 require_once '../api/config.php';
+require_once '../api/db.php';
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: index.php');
     exit;
 }
+
+$adminDisplayName = $_SESSION['display_name'] ?? 'Admin';
+$adminRole = $_SESSION['user_role'] ?? 'user';
+$allowedStudies = $_SESSION['allowed_studies'] ?? [];
+$userId = $_SESSION['user_id'] ?? '';
+$userDbId = $_SESSION['user_db_id'] ?? null;
+
 if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > SESSION_TIMEOUT)) {
     session_unset();
     session_destroy();
@@ -18,11 +26,22 @@ if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 
 }
 $_SESSION['last_activity'] = time();
 if (isset($_GET['logout'])) {
+    // Logger la déconnexion en MySQL
+    try {
+        dbExecute(
+            "INSERT INTO admin_logs (user_id, action, username, ip_address, details) VALUES (?, 'logout', ?, ?, ?)",
+            [$userDbId, $_SESSION['username'] ?? null, $_SERVER['REMOTE_ADDR'] ?? null, "Déconnexion: $adminDisplayName"]
+        );
+    } catch (Exception $e) {
+        // Ignorer les erreurs de log
+    }
     session_unset();
     session_destroy();
     header('Location: index.php');
     exit;
 }
+
+$canAccessAllStudies = ($adminRole === 'super_admin' || $adminRole === 'admin' || in_array('*', $allowedStudies));
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -40,7 +59,9 @@ if (isset($_GET['logout'])) {
                     colors: {
                         sidebar: '#0f172a',
                         'sidebar-hover': '#1e3a5f',
-                        'sidebar-active': '#3b82f6'
+                        'sidebar-active': '#3b82f6',
+                        'mdt-blue': '#0F243E',
+                        'mdt-light': '#f8fafc'
                     }
                 }
             }
@@ -49,152 +70,285 @@ if (isset($_GET['logout'])) {
     <style>
         tr.hidden-by-filter { display: none; }
         .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-        .scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
         .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .filter-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 16px;
+            padding-right: 32px;
+        }
+        /* Multi-select dropdown styles */
+        .multi-select-container {
+            position: relative;
+            display: inline-block;
+            min-width: 140px;
+        }
+        .multi-select-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+        .multi-select-btn:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .multi-select-btn.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border-color: #2563eb;
+        }
+        .multi-select-btn .arrow {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+        .multi-select-btn.open .arrow {
+            transform: rotate(180deg);
+        }
+        .multi-select-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            min-width: 200px;
+            max-width: 280px;
+            max-height: 250px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none;
+            padding: 6px;
+        }
+        .multi-select-dropdown.show {
+            display: block;
+            animation: dropdownFadeIn 0.15s ease;
+        }
+        @keyframes dropdownFadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .multi-select-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            font-size: 13px;
+            color: #334155;
+        }
+        .multi-select-option:hover {
+            background: #f1f5f9;
+        }
+        .multi-select-option input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 2px solid #cbd5e1;
+            cursor: pointer;
+            accent-color: #3b82f6;
+        }
+        .multi-select-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: white;
+            color: #3b82f6;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 10px;
+        }
+        .multi-select-btn.active .multi-select-badge {
+            background: rgba(255,255,255,0.25);
+            color: white;
+        }
+        /* Filter tags */
+        .filter-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 6px;
+            font-size: 12px;
+            color: white;
+            backdrop-filter: blur(4px);
+        }
+        .filter-tag-remove {
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.15s ease;
+        }
+        .filter-tag-remove:hover {
+            opacity: 1;
+        }
+        /* Filters section */
+        .filters-wrapper {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        .filters-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+        }
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            transition: all 0.2s ease;
+        }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            transition: box-shadow 0.2s ease;
+        }
+        .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+        .stat-card { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media (max-width: 768px) {
+            .sidebar-mobile { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar-mobile.open { transform: translateX(0); }
+            .sidebar-overlay { opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+            .sidebar-overlay.open { opacity: 1; visibility: visible; }
+        }
     </style>
 </head>
-<body class="bg-gray-50 font-sans">
+<body class="bg-mdt-light font-sans">
     <div class="flex h-screen overflow-hidden">
-        
-        <aside class="w-52 bg-sidebar flex flex-col">
+        <div id="sidebar-overlay" class="sidebar-overlay fixed inset-0 bg-black/50 z-40 md:hidden" onclick="toggleMobileMenu()"></div>
+        <aside id="sidebar" class="sidebar-mobile md:translate-x-0 fixed md:relative w-64 md:w-52 bg-sidebar flex flex-col z-50 h-full">
             <div class="p-4 flex items-center gap-3">
-                <div class="w-9 h-9 bg-sidebar-active rounded-lg flex items-center justify-center text-white font-bold">M</div>
+                <div class="w-9 h-9 bg-sidebar-active rounded-lg flex items-center justify-center text-white font-bold text-lg">M</div>
                 <div>
                     <div class="text-white font-semibold text-sm">Administration</div>
                     <div class="text-white/60 text-xs">Maison du Test</div>
                 </div>
             </div>
-            
             <nav class="flex-1 px-3 py-4 space-y-1">
-                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                    Tableau de bord
-                </button>
-                <button onclick="switchTab('studies')" id="nav-studies" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    Études
-                </button>
-                <button onclick="switchTab('closed')" id="nav-closed" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-                    Archives
-                </button>
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">Tableau de bord</button>
+                <button onclick="switchTab('studies')" id="nav-studies" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">Études</button>
+                <?php if ($adminRole === 'super_admin'): ?>
+                <button onclick="switchTab('dataia')" id="nav-dataia" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">🤖 Data IA</button>
+                <?php endif; ?>
+                <button onclick="switchTab('closed')" id="nav-closed" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">Archives</button>
+                <?php if ($adminRole === 'super_admin'): ?>
+                <button onclick="switchTab('accounts')" id="nav-accounts" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">Comptes</button>
+                <?php endif; ?>
             </nav>
-            
             <div class="p-4 border-t border-white/10">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                        <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                    </div>
+                    <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white font-medium text-sm"><?= strtoupper(substr($adminDisplayName, 0, 1)) ?></div>
                     <div class="flex-1 min-w-0">
-                        <div class="text-white text-sm font-medium truncate">Admin MDT</div>
-                        <div class="text-white/50 text-xs truncate">admin@mdt.fr</div>
+                        <div class="text-white text-sm font-medium truncate"><?= htmlspecialchars($adminDisplayName) ?></div>
+                        <div class="text-white/50 text-xs truncate"><?php if ($adminRole === 'super_admin') echo 'Super Admin'; elseif ($adminRole === 'admin') echo 'Admin'; else echo 'Utilisateur'; ?></div>
                     </div>
                 </div>
             </div>
         </aside>
-
         <div class="flex-1 flex flex-col overflow-hidden">
-            <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <h1 class="text-xl font-semibold text-gray-800" id="page-title">Tableau de bord</h1>
-                </div>
+            <header class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <button onclick="loadData()" class="p-2 hover:bg-gray-100 rounded-lg transition" title="Actualiser">
-                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    </button>
-                    <a href="change-password.php" class="p-2 hover:bg-gray-100 rounded-lg transition" title="Paramètres">
-                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </a>
-                    <a href="?logout=1" class="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
-                        Déconnexion
-                    </a>
+                    <button onclick="toggleMobileMenu()" class="md:hidden p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 text-xl">☰</button>
+                    <h1 class="text-lg md:text-xl font-semibold text-gray-800 truncate" id="page-title">Tableau de bord</h1>
+                </div>
+                <div class="flex items-center gap-2 md:gap-3">
+                    <button onclick="loadData()" class="p-2 hover:bg-gray-100 rounded-lg transition text-gray-500 text-lg" title="Actualiser">↻</button>
+                    <?php if ($adminRole === 'super_admin'): ?>
+                    <a href="change-password.php" class="hidden sm:block p-2 hover:bg-gray-100 rounded-lg transition text-gray-500 text-lg" title="Paramètres">⚙</a>
+                    <?php endif; ?>
+                    <a href="?logout=1" class="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"><span class="hidden sm:inline">Déconnexion</span><span class="sm:hidden">✕</span></a>
                 </div>
             </header>
-
-            <main class="flex-1 overflow-y-auto scrollbar-thin p-6" id="main-content">
-                <div class="flex items-center justify-center h-64">
-                    <div class="animate-spin w-8 h-8 border-4 border-sidebar-active border-t-transparent rounded-full"></div>
-                </div>
+            <main class="flex-1 overflow-y-auto scrollbar-thin p-4 md:p-6" id="main-content">
+                <div class="flex items-center justify-center h-64"><div class="animate-spin w-8 h-8 border-4 border-sidebar-active border-t-transparent rounded-full"></div></div>
             </main>
         </div>
     </div>
-
-    <div id="responses-modal" class="fixed inset-0 bg-black/40 z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div id="responses-modal" class="fixed inset-0 bg-black/40 z-50 hidden items-center justify-center p-2 md:p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h3 id="modal-title" class="font-semibold text-gray-800">Détail</h3>
-                <button onclick="closeModal()" class="p-1 hover:bg-gray-100 rounded-lg transition">
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+                <button onclick="closeModal()" class="p-2 hover:bg-gray-100 rounded-lg transition text-gray-400 text-xl">✕</button>
             </div>
-            <div id="modal-body" class="p-6 overflow-y-auto flex-1 scrollbar-thin"></div>
-            <div id="modal-footer" class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 hidden">
-                <button onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Annuler</button>
-                <button onclick="saveChanges()" class="px-4 py-2 text-sm bg-sidebar-active text-white hover:bg-blue-600 rounded-lg transition">Enregistrer</button>
+            <div id="modal-body" class="p-4 md:p-6 overflow-y-auto flex-1 scrollbar-thin"></div>
+            <div id="modal-footer" class="px-4 md:px-6 py-4 border-t border-gray-100 flex justify-end gap-3 hidden">
+                <button onclick="closeModal()" class="px-4 py-2 text-sm btn-secondary rounded-lg">Annuler</button>
+                <button onclick="saveChanges()" class="px-4 py-2 text-sm btn-primary rounded-lg">Enregistrer</button>
             </div>
         </div>
     </div>
-
-    <!-- Modal de prévisualisation -->
-    <div id="preview-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
-        <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div class="px-6 py-4 bg-purple-600 text-white flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    <div>
-                        <h3 id="preview-title" class="font-semibold">Prévisualisation</h3>
-                        <p id="preview-subtitle" class="text-sm text-purple-200"></p>
-                    </div>
-                </div>
-                <button onclick="closePreview()" class="p-2 hover:bg-purple-500 rounded-lg transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+    <div id="preview-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-2 md:p-4">
+        <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="px-4 md:px-6 py-4 bg-purple-600 text-white flex items-center justify-between">
+                <div><h3 id="preview-title" class="font-semibold">Prévisualisation</h3><p id="preview-subtitle" class="text-sm text-purple-200"></p></div>
+                <button onclick="closePreview()" class="p-2 hover:bg-purple-500 rounded-lg transition text-xl">✕</button>
             </div>
-            <div class="px-6 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-500">Question</span>
-                    <span id="preview-counter" class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-medium text-sm">1 / 10</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <select id="preview-jump" onchange="jumpToQuestion()" class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg">
-                    </select>
-                </div>
+            <div class="px-4 md:px-6 py-3 bg-white border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2"><span class="text-sm text-gray-500">Question</span><span id="preview-counter" class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-medium text-sm">1 / 10</span></div>
+                <select id="preview-jump" onchange="jumpToQuestion()" class="filter-select px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white shadow-sm"></select>
             </div>
-            <div id="preview-body" class="p-6 overflow-y-auto flex-1 bg-white">
-                <!-- Contenu de la question -->
-            </div>
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                <button onclick="prevQuestion()" id="preview-prev" class="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                    Précédent
-                </button>
-                <div class="flex items-center gap-1" id="preview-dots"></div>
-                <button onclick="nextQuestion()" id="preview-next" class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2">
-                    Suivant
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                </button>
+            <div id="preview-body" class="p-4 md:p-6 overflow-y-auto flex-1 bg-white"></div>
+            <div class="px-4 md:px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                <button onclick="prevQuestion()" id="preview-prev" class="px-4 py-2 text-sm btn-secondary rounded-lg">← Précédent</button>
+                <div class="hidden md:flex items-center gap-1" id="preview-dots"></div>
+                <button onclick="nextQuestion()" id="preview-next" class="px-4 py-2 text-sm btn-primary rounded-lg">Suivant →</button>
             </div>
         </div>
     </div>
-
     <script>
         let allData = null;
         let currentTab = 'dashboard';
         let currentStudyId = null;
         let currentEditData = null;
         let isEditMode = false;
+        const userRole = '<?= $adminRole ?>';
+        const canEdit = (userRole === 'super_admin');
+
+        function toggleMobileMenu() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebar-overlay').classList.toggle('open');
+        }
 
         async function loadData() {
             try {
                 const response = await fetch('../api/admin-data.php');
                 const data = await response.json();
-                if (data.success) {
-                    allData = data;
-                    render();
-                }
-            } catch (error) {
-                console.error('Erreur:', error);
-            }
+                if (data.success) { allData = data; render(); }
+            } catch (error) { console.error('Erreur:', error); }
         }
 
         function switchTab(tab, studyId = null) {
@@ -209,164 +363,106 @@ if (isset($_GET['logout'])) {
                 active.classList.add('bg-sidebar-active', 'text-white');
                 active.classList.remove('text-white/70', 'hover:bg-sidebar-hover');
             }
-            
-            let title = { dashboard: 'Tableau de bord', studies: 'Études actives', closed: 'Archives' }[tab] || 'Tableau de bord';
+            let title = { dashboard: 'Tableau de bord', studies: 'Études actives', dataia: 'Data IA - Collecte de données', closed: 'Archives', accounts: 'Gestion des comptes' }[tab] || 'Tableau de bord';
             if (studyId && allData) {
                 const study = allData.studies.find(s => s.studyId === studyId);
                 if (study) title = study.studyName;
             }
             document.getElementById('page-title').textContent = title;
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('sidebar-overlay').classList.remove('open');
+            }
             render();
         }
 
         function goToStudy(studyId) {
             const study = allData.studies.find(s => s.studyId === studyId);
             if (!study) return;
-            const isClosed = study.status === 'closed';
-            switchTab(isClosed ? 'closed' : 'studies', studyId);
+            // Rediriger vers l'onglet approprié selon le type d'étude
+            let tab;
+            if (study.status === 'closed') {
+                tab = 'closed';
+            } else if (study.studyType === 'data_collection') {
+                tab = 'dataia';
+            } else {
+                tab = 'studies';
+            }
+            switchTab(tab, studyId);
         }
 
         function render() {
-            if (!allData) return;
+            if (!allData && currentTab !== 'accounts') return;
             if (currentTab === 'dashboard') renderDashboard();
-            else if (currentTab === 'studies') {
-                if (currentStudyId) renderStudyDetail(currentStudyId, false);
-                else renderStudiesList(false);
-            }
-            else if (currentTab === 'closed') {
-                if (currentStudyId) renderStudyDetail(currentStudyId, true);
-                else renderStudiesList(true);
-            }
+            else if (currentTab === 'studies') { if (currentStudyId) renderStudyDetail(currentStudyId, false); else renderStudiesList(false); }
+            else if (currentTab === 'dataia') { if (currentStudyId) renderStudyDetail(currentStudyId, false); else renderIADashboard(); }
+            else if (currentTab === 'closed') { if (currentStudyId) renderStudyDetail(currentStudyId, true); else renderStudiesList(true); }
+            else if (currentTab === 'accounts') renderAccounts();
         }
 
         function renderDashboard() {
             const studies = allData.studies || [];
-            const activeStudies = studies.filter(s => s.status !== 'closed');
-            let totalQualifies = 0, totalRefuses = 0, totalParticipants = 0;
+            // Séparer les études normales et IA
+            const normalStudies = studies.filter(s => s.studyType !== 'data_collection');
+            const iaStudies = studies.filter(s => s.studyType === 'data_collection');
+            const activeNormalStudies = normalStudies.filter(s => s.status !== 'closed');
+            const activeIaStudies = iaStudies.filter(s => s.status !== 'closed');
             
-            studies.forEach(s => {
-                totalQualifies += (s.stats?.qualifies || 0);
-                totalRefuses += (s.stats?.refuses || 0);
-                totalParticipants += (s.stats?.total || 0);
+            // Stats pour études normales uniquement
+            let totalQualifies = 0, totalRefuses = 0, totalParticipants = 0;
+            normalStudies.forEach(s => { totalQualifies += s.stats?.qualifies || 0; totalRefuses += s.stats?.refuses || 0; totalParticipants += s.stats?.total || 0; });
+            
+            // Stats pour études IA
+            let iaParticipants = 0, iaTexts = 0;
+            iaStudies.forEach(s => {
+                iaParticipants += (s.qualifies || []).length;
+                (s.qualifies || []).forEach(p => { iaTexts += parseInt(p.texts_count) || 0; });
             });
             
-            const taux = totalParticipants > 0 ? Math.round((totalQualifies / totalParticipants) * 100) : 0;
-
-            let html = `
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-                    <div class="bg-white rounded-xl p-5 border border-gray-100 flex items-center justify-between">
+            let html = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+                <div class="card stat-card p-4"><p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Études actives</p><p class="text-2xl md:text-3xl font-bold text-sidebar-active">${activeNormalStudies.length}</p></div>
+                <div class="card stat-card p-4"><p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Total participants</p><p class="text-2xl md:text-3xl font-bold text-gray-800">${totalParticipants}</p></div>
+                <div class="card stat-card p-4"><p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Qualifiés</p><p class="text-2xl md:text-3xl font-bold text-green-600">${totalQualifies}</p></div>
+                <div class="card stat-card p-4"><p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Refusés</p><p class="text-2xl md:text-3xl font-bold text-red-500">${totalRefuses}</p></div>
+            </div>
+            
+            ${(activeIaStudies.length > 0 && userRole === 'super_admin') ? `
+            <!-- Encart Data IA (super_admin uniquement) -->
+            <div class="mb-6 card p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 cursor-pointer hover:shadow-lg transition" onclick="switchTab('dataia')">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg">🤖</div>
                         <div>
-                            <p class="text-sm text-gray-500 mb-1">Participants total</p>
-                            <p class="text-3xl font-bold text-gray-800">${totalParticipants}</p>
-                            <p class="text-xs text-blue-500 mt-1 flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                                actif
-                            </p>
-                        </div>
-                        <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            <h3 class="font-semibold text-gray-800">Collecte Data IA</h3>
+                            <p class="text-sm text-purple-600">${activeIaStudies.length} étude${activeIaStudies.length > 1 ? 's' : ''} active${activeIaStudies.length > 1 ? 's' : ''} • ${iaParticipants} participants • ${iaTexts} textes</p>
                         </div>
                     </div>
-                    <div class="bg-white rounded-xl p-5 border border-gray-100 flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-500 mb-1">Qualifiés</p>
-                            <p class="text-3xl font-bold text-gray-800">${totalQualifies}</p>
-                            <p class="text-xs text-blue-500 mt-1 flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                                +${totalQualifies}
-                            </p>
-                        </div>
-                        <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl p-5 border border-gray-100 flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-500 mb-1">Études actives</p>
-                            <p class="text-3xl font-bold text-gray-800">${activeStudies.length}</p>
-                            <p class="text-xs text-blue-500 mt-1 flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                                en cours
-                            </p>
-                        </div>
-                        <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
-                            <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-xl p-5 border border-gray-100 flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-500 mb-1">Taux de réponse</p>
-                            <p class="text-3xl font-bold text-gray-800">${taux}%</p>
-                            <p class="text-xs text-blue-500 mt-1 flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                                +${taux > 50 ? '5' : '2'}%
-                            </p>
-                        </div>
-                        <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
-                            <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                        </div>
-                    </div>
+                    <div class="text-purple-600 text-xl">→</div>
                 </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-6">
-                        <div class="flex items-center justify-between mb-6">
-                            <h2 class="font-semibold text-gray-800">Études récentes</h2>
-                            <button onclick="switchTab('studies')" class="text-sm text-sidebar-active hover:underline">Voir tout</button>
-                        </div>
-                        <div class="space-y-4">
-                            ${activeStudies.slice(0, 5).map(s => `
-                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer" onclick="goToStudy('${s.studyId}')">
-                                <div>
-                                    <p class="font-medium text-gray-800 hover:text-sidebar-active">${s.studyName}</p>
-                                    <p class="text-sm text-gray-500">${s.studyDate || ''}</p>
-                                </div>
-                                <div class="flex items-center gap-4">
-                                    <div class="text-right">
-                                        <p class="text-sm font-semibold text-gray-800">${s.stats?.qualifies || 0}/${s.stats?.total || 0}</p>
-                                        <p class="text-xs text-gray-500">qualifiés</p>
-                                    </div>
-                                    <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-sidebar-active rounded-full" style="width: ${s.stats?.total > 0 ? Math.round((s.stats.qualifies / s.stats.total) * 100) : 0}%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            `).join('') || '<p class="text-gray-400 text-center py-8">Aucune étude active</p>'}
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl border border-gray-100 p-6">
-                        <h2 class="font-semibold text-gray-800 mb-6">Activité récente</h2>
-                        <div class="space-y-4">
-                            ${getRecentActivity()}
-                        </div>
-                    </div>
+            </div>` : ''}
+            
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+                <div class="xl:col-span-2 card p-4 md:p-6">
+                    <div class="flex items-center justify-between mb-4"><h2 class="font-semibold text-gray-800">Études en cours</h2><button onclick="switchTab('studies')" class="text-sm text-sidebar-active hover:underline">Voir tout</button></div>
+                    <div class="space-y-3">${activeNormalStudies.length === 0 ? '<p class="text-gray-400 text-sm">Aucune étude active</p>' : activeNormalStudies.slice(0, 5).map(s => {
+                        const progress = s.stats?.total > 0 ? Math.round((s.stats.qualifies / s.stats.total) * 100) : 0;
+                        return `<div class="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition" onclick="goToStudy('${s.studyId}')">
+                            <div class="w-10 h-10 bg-sidebar-active/10 rounded-lg flex items-center justify-center text-sidebar-active font-bold text-sm">${s.studyName.substring(0,2).toUpperCase()}</div>
+                            <div class="flex-1 min-w-0"><p class="font-medium text-gray-800 truncate">${esc(s.studyName)}</p><div class="flex items-center gap-2 mt-1"><div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-sidebar-active rounded-full" style="width: ${progress}%"></div></div><span class="text-xs text-gray-500">${progress}%</span></div></div>
+                            <div class="text-right"><p class="text-sm font-semibold text-gray-800">${s.stats?.qualifies || 0}</p><p class="text-xs text-gray-400">qualifiés</p></div>
+                        </div>`;
+                    }).join('')}</div>
                 </div>
-            `;
+                <div class="card p-4 md:p-6"><h2 class="font-semibold text-gray-800 mb-4">Activité récente</h2><div class="space-y-4">${getRecentActivity()}</div></div>
+            </div>`;
             document.getElementById('main-content').innerHTML = html;
         }
 
         function getRecentActivity() {
             const activities = [];
-            (allData.studies || []).forEach(s => {
-                (s.qualifies || []).forEach(p => {
-                    activities.push({ name: p.prenom + ' ' + p.nom, study: s.studyName, studyId: s.studyId, date: p.date });
-                });
-            });
+            (allData.studies || []).forEach(s => { (s.qualifies || []).forEach(p => { activities.push({ name: p.prenom + ' ' + p.nom, study: s.studyName, studyId: s.studyId, date: p.date }); }); });
             activities.sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            return activities.slice(0, 5).map(a => `
-                <div class="flex items-start gap-3">
-                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm"><span class="font-medium text-gray-800">${esc(a.name)}</span> <span class="text-gray-500">s'est qualifié(e)</span></p>
-                        <p class="text-xs text-sidebar-active truncate">${esc(a.study)}</p>
-                        <p class="text-xs text-gray-400">${formatTimeAgo(a.date)}</p>
-                    </div>
-                </div>
-            `).join('') || '<p class="text-gray-400 text-sm">Aucune activité récente</p>';
+            return activities.slice(0, 5).map(a => `<div class="flex items-start gap-3"><div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 text-green-600 text-sm font-bold">✓</div><div class="flex-1 min-w-0"><p class="text-sm"><span class="font-medium text-gray-800">${esc(a.name)}</span> <span class="text-gray-500">qualifié(e)</span></p><p class="text-xs text-sidebar-active truncate">${esc(a.study)}</p><p class="text-xs text-gray-400">${formatTimeAgo(a.date)}</p></div></div>`).join('') || '<p class="text-gray-400 text-sm">Aucune activité récente</p>';
         }
 
         function formatTimeAgo(date) {
@@ -379,49 +475,231 @@ if (isset($_GET['logout'])) {
             return 'Il y a ' + Math.floor(hours / 24) + 'j';
         }
 
-        function renderStudiesList(showClosed) {
-            let studies = (allData.studies || []).filter(s => showClosed ? s.status === 'closed' : s.status !== 'closed');
+        // ============================================================
+        // DASHBOARD DATA IA - Métriques spécifiques pour la collecte de données
+        // ============================================================
+        function renderIADashboard() {
+            // Filtrer uniquement les études de type data_collection
+            const iaStudies = (allData.studies || []).filter(s => s.studyType === 'data_collection' && s.status !== 'closed');
+            const closedIaStudies = (allData.studies || []).filter(s => s.studyType === 'data_collection' && s.status === 'closed');
             
-            if (studies.length === 0) {
-                document.getElementById('main-content').innerHTML = '<div class="flex flex-col items-center justify-center h-64 text-gray-400"><p>Aucune étude</p></div>';
-                return;
-            }
+            // Calculer les métriques globales
+            let totalParticipants = 0, totalTexts = 0, totalQualitySum = 0, totalTrustSum = 0, totalAttentionSum = 0;
+            let participantsWithQuality = 0;
+            
+            iaStudies.forEach(s => {
+                const qualifies = s.qualifies || [];
+                totalParticipants += qualifies.length;
+                qualifies.forEach(p => {
+                    if (p.quality_score !== undefined && p.quality_score !== null) {
+                        totalQualitySum += parseFloat(p.quality_score) || 0;
+                        participantsWithQuality++;
+                    }
+                    if (p.trust_score !== undefined) totalTrustSum += parseFloat(p.trust_score) || 0;
+                    if (p.attention_score !== undefined) totalAttentionSum += parseFloat(p.attention_score) || 0;
+                    if (p.texts_count !== undefined) totalTexts += parseInt(p.texts_count) || 0;
+                });
+            });
+            
+            const avgQuality = participantsWithQuality > 0 ? (totalQualitySum / participantsWithQuality).toFixed(1) : '—';
+            const avgTrust = participantsWithQuality > 0 ? (totalTrustSum / participantsWithQuality).toFixed(1) : '—';
+            const avgAttention = participantsWithQuality > 0 ? (totalAttentionSum / participantsWithQuality).toFixed(0) : '—';
+            
+            // Calculer la distribution des scores de qualité
+            const qualityDistribution = { excellent: 0, good: 0, average: 0, poor: 0 };
+            iaStudies.forEach(s => {
+                (s.qualifies || []).forEach(p => {
+                    const q = parseFloat(p.quality_score) || 0;
+                    if (q >= 8) qualityDistribution.excellent++;
+                    else if (q >= 6) qualityDistribution.good++;
+                    else if (q >= 4) qualityDistribution.average++;
+                    else if (q > 0) qualityDistribution.poor++;
+                });
+            });
+            
+            let html = `
+            <!-- En-tête avec icône IA -->
+            <div class="mb-6 flex items-center gap-3">
+                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg">🤖</div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Collecte de données IA</h2>
+                    <p class="text-sm text-gray-500">Métriques pour l'entraînement de modèles</p>
+                </div>
+            </div>
+            
+            <!-- Stats principales -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
+                <div class="card p-4 bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+                    <p class="text-xs text-purple-600 uppercase tracking-wide mb-1 font-medium">Études actives</p>
+                    <p class="text-2xl md:text-3xl font-bold text-purple-700">${iaStudies.length}</p>
+                </div>
+                <div class="card p-4 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                    <p class="text-xs text-blue-600 uppercase tracking-wide mb-1 font-medium">Participants</p>
+                    <p class="text-2xl md:text-3xl font-bold text-blue-700">${totalParticipants}</p>
+                </div>
+                <div class="card p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                    <p class="text-xs text-green-600 uppercase tracking-wide mb-1 font-medium">Score Qualité</p>
+                    <p class="text-2xl md:text-3xl font-bold text-green-700">${avgQuality}<span class="text-lg text-green-500">/10</span></p>
+                </div>
+                <div class="card p-4 bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200">
+                    <p class="text-xs text-amber-600 uppercase tracking-wide mb-1 font-medium">Trust Score</p>
+                    <p class="text-2xl md:text-3xl font-bold text-amber-700">${avgTrust}<span class="text-lg text-amber-500">/10</span></p>
+                </div>
+                <div class="card p-4 bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200">
+                    <p class="text-xs text-rose-600 uppercase tracking-wide mb-1 font-medium">Textes générés</p>
+                    <p class="text-2xl md:text-3xl font-bold text-rose-700">${totalTexts}</p>
+                </div>
+            </div>
+            
+            <!-- Grille principale -->
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+                <!-- Études IA en cours -->
+                <div class="xl:col-span-2 card p-4 md:p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-800">Études en cours</h3>
+                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">${iaStudies.length} active${iaStudies.length > 1 ? 's' : ''}</span>
+                    </div>
+                    ${iaStudies.length === 0 ? '<p class="text-gray-400 text-sm text-center py-8">Aucune étude IA active</p>' : 
+                    `<div class="space-y-3">
+                        ${iaStudies.map(s => {
+                            const qualifies = s.qualifies || [];
+                            const avgQ = qualifies.length > 0 ? (qualifies.reduce((sum, p) => sum + (parseFloat(p.quality_score) || 0), 0) / qualifies.length).toFixed(1) : '—';
+                            const totalT = qualifies.reduce((sum, p) => sum + (parseInt(p.texts_count) || 0), 0);
+                            return `<div class="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl hover:shadow-md cursor-pointer transition" onclick="switchTab('dataia', '${s.studyId}')">
+                                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow">${s.studyName.substring(0,2).toUpperCase()}</div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-semibold text-gray-800 truncate">${esc(s.studyName)}</p>
+                                    <div class="flex items-center gap-4 mt-1 text-xs">
+                                        <span class="text-purple-600">👥 ${qualifies.length} participants</span>
+                                        <span class="text-green-600">⭐ ${avgQ}/10 qualité</span>
+                                        <span class="text-blue-600">📝 ${totalT} textes</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="flex gap-2">
+                                        <button onclick="event.stopPropagation(); exportJSONL('${s.studyId}')" class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">JSONL</button>
+                                    </div>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>`}
+                </div>
+                
+                <!-- Distribution Qualité -->
+                <div class="card p-4 md:p-6">
+                    <h3 class="font-semibold text-gray-800 mb-4">Distribution Qualité</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm w-20 text-gray-600">Excellent</span>
+                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-green-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.excellent / participantsWithQuality * 100) : 0}%"></div>
+                            </div>
+                            <span class="text-sm font-semibold text-green-600 w-8">${qualityDistribution.excellent}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm w-20 text-gray-600">Bon</span>
+                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.good / participantsWithQuality * 100) : 0}%"></div>
+                            </div>
+                            <span class="text-sm font-semibold text-blue-600 w-8">${qualityDistribution.good}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm w-20 text-gray-600">Moyen</span>
+                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-amber-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.average / participantsWithQuality * 100) : 0}%"></div>
+                            </div>
+                            <span class="text-sm font-semibold text-amber-600 w-8">${qualityDistribution.average}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm w-20 text-gray-600">Faible</span>
+                            <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-red-500 rounded-full transition-all" style="width: ${participantsWithQuality > 0 ? (qualityDistribution.poor / participantsWithQuality * 100) : 0}%"></div>
+                            </div>
+                            <span class="text-sm font-semibold text-red-600 w-8">${qualityDistribution.poor}</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <p class="text-xs text-gray-500">Excellent ≥8 | Bon ≥6 | Moyen ≥4 | Faible <4</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section Export global -->
+            <div class="mt-6 card p-4 md:p-6 bg-gradient-to-r from-slate-50 to-gray-50">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-semibold text-gray-800">Export des données</h3>
+                        <p class="text-sm text-gray-500 mt-1">Exportez toutes les données au format JSONL pour l'entraînement</p>
+                    </div>
+                    <div class="flex gap-3">
+                        ${iaStudies.map(s => `<button onclick="exportJSONL('${s.studyId}')" class="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2">
+                            <span>📥</span> ${s.studyName.substring(0, 15)}${s.studyName.length > 15 ? '...' : ''}
+                        </button>`).join('')}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Archives IA -->
+            ${closedIaStudies.length > 0 ? `
+            <div class="mt-6 card p-4 md:p-6">
+                <h3 class="font-semibold text-gray-800 mb-4">Études terminées (${closedIaStudies.length})</h3>
+                <div class="space-y-2">
+                    ${closedIaStudies.map(s => {
+                        const qualifies = s.qualifies || [];
+                        return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center text-white font-bold text-xs">${s.studyName.substring(0,2).toUpperCase()}</div>
+                                <span class="text-gray-600">${esc(s.studyName)}</span>
+                                <span class="text-xs text-gray-400">(${qualifies.length} participants)</span>
+                            </div>
+                            <button onclick="exportJSONL('${s.studyId}')" class="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition">Export</button>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>` : ''}
+            `;
+            
+            document.getElementById('main-content').innerHTML = html;
+        }
 
-            let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">`;
+        function renderStudiesList(showClosed) {
+            // Exclure les études de type data_collection (affichées dans l'onglet Data IA)
+            let studies = (allData.studies || []).filter(s => {
+                const isDataCollection = s.studyType === 'data_collection';
+                const matchStatus = showClosed ? s.status === 'closed' : s.status !== 'closed';
+                return matchStatus && !isDataCollection;
+            });
+            
+            // Header avec bouton créer (seulement pour études actives et si admin/super_admin)
+            let headerHtml = '';
+            if (!showClosed && (userRole === 'admin' || userRole === 'super_admin')) {
+                headerHtml = `<div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-semibold text-gray-800">Études en cours (${studies.length})</h2>
+                    <button onclick="openStudyBuilder()" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition flex items-center gap-2 text-sm">
+                        <span class="text-lg">+</span> Créer une étude
+                    </button>
+                </div>`;
+            }
+            
+            if (studies.length === 0) { 
+                let emptyHtml = headerHtml + '<div class="flex flex-col items-center justify-center h-64 text-gray-400"><p>Aucune étude</p>';
+                if (!showClosed && (userRole === 'admin' || userRole === 'super_admin')) {
+                    emptyHtml += '<button onclick="openStudyBuilder()" class="mt-4 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm">Créer ma première étude</button>';
+                }
+                emptyHtml += '</div>';
+                document.getElementById('main-content').innerHTML = emptyHtml; 
+                return; 
+            }
+            let html = headerHtml + `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">`;
             studies.forEach(study => {
                 const stats = study.stats || {};
                 const progress = stats.total > 0 ? Math.round((stats.qualifies / stats.total) * 100) : 0;
-                html += `
-                <div class="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition cursor-pointer" onclick="goToStudy('${study.studyId}')">
-                    <div class="flex items-start justify-between mb-4">
-                        <div class="w-12 h-12 bg-sidebar-active/10 rounded-xl flex items-center justify-center">
-                            <svg class="w-6 h-6 text-sidebar-active" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        </div>
-                        ${showClosed ? '<span class="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">Terminée</span>' : '<span class="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-full">Active</span>'}
-                    </div>
-                    <h3 class="font-semibold text-gray-800 mb-1">${study.studyName}</h3>
-                    <p class="text-sm text-gray-500 mb-4">${study.studyDate || ''}</p>
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm text-gray-500">Progression</span>
-                        <span class="text-sm font-semibold text-gray-800">${stats.qualifies || 0}/${stats.total || 0}</span>
-                    </div>
-                    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-sidebar-active rounded-full transition-all" style="width: ${progress}%"></div>
-                    </div>
-                    <div class="mt-4 pt-4 border-t border-gray-100 flex justify-between text-sm">
-                        <div class="text-center">
-                            <p class="font-semibold text-blue-600">${stats.qualifies || 0}</p>
-                            <p class="text-gray-400 text-xs">Qualifiés</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="font-semibold text-red-500">${stats.refuses || 0}</p>
-                            <p class="text-gray-400 text-xs">Refusés</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="font-semibold text-amber-500">${progress}%</p>
-                            <p class="text-gray-400 text-xs">Taux</p>
-                        </div>
-                    </div>
+                html += `<div class="card p-5 hover:shadow-lg transition cursor-pointer" onclick="goToStudy('${study.studyId}')">
+                    <div class="flex items-start justify-between mb-4"><div class="w-12 h-12 bg-sidebar-active/10 rounded-xl flex items-center justify-center text-sidebar-active font-bold">${study.studyName.substring(0,2).toUpperCase()}</div>${showClosed ? '<span class="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">Terminée</span>' : '<span class="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-full">Active</span>'}</div>
+                    <h3 class="font-semibold text-gray-800 mb-1 leading-tight">${esc(study.studyName)}</h3><p class="text-sm text-gray-500 mb-4">${esc(study.studyDate || '')}</p>
+                    <div class="flex items-center justify-between mb-2"><span class="text-sm text-gray-500">Progression</span><span class="text-sm font-semibold text-gray-800">${stats.qualifies || 0}/${stats.total || 0}</span></div>
+                    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-sidebar-active rounded-full transition-all" style="width: ${progress}%"></div></div>
+                    <div class="mt-4 pt-4 border-t border-gray-100 flex justify-between text-sm"><div class="text-center"><p class="font-semibold text-blue-600">${stats.qualifies || 0}</p><p class="text-gray-400 text-xs">Qualifiés</p></div><div class="text-center"><p class="font-semibold text-red-500">${stats.refuses || 0}</p><p class="text-gray-400 text-xs">Refusés</p></div><div class="text-center"><p class="font-semibold text-amber-500">${progress}%</p><p class="text-gray-400 text-xs">Taux</p></div></div>
                 </div>`;
             });
             html += '</div>';
@@ -430,492 +708,424 @@ if (isset($_GET['logout'])) {
 
         function renderStudyDetail(studyId, showClosed) {
             const study = allData.studies.find(s => s.studyId === studyId);
-            if (!study) {
-                renderStudiesList(showClosed);
-                return;
-            }
+            if (!study) { renderStudiesList(showClosed); return; }
+            const stats = study.stats || {}, qualifies = study.qualifies || [], refuses = study.refuses || [];
+            const isDataCollection = study.studyType === 'data_collection';
 
-            const stats = study.stats || {};
-            const qualifies = study.qualifies || [];
-            const refuses = study.refuses || [];
-
-            let html = `
-            <div class="mb-6">
-                <button onclick="switchTab('${showClosed ? 'closed' : 'studies'}')" class="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition mb-4">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                    Retour aux études
-                </button>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-semibold text-gray-800">${study.studyName}</h2>
-                        <p class="text-sm text-gray-500">${study.studyDate || ''}</p>
-                        <a href="../studies/${study.folder}/" target="_blank" class="inline-flex items-center gap-1 text-sm text-sidebar-active hover:underline mt-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                            Ouvrir le questionnaire
-                        </a>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="previewStudy('${study.folder}')" class="px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                            Prévisualiser
-                        </button>
-                        <button onclick="copyStudyLink('${study.folder}')" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-                            Copier le lien
-                        </button>
-                        ${!showClosed ? `<button onclick="closeStudy('${study.folder}')" class="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">Terminer</button>` : `<button onclick="reopenStudy('${study.folder}')" class="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition">Réouvrir l'étude</button>`}
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-5 gap-4 mb-6">
-                <div class="bg-white rounded-xl p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase mb-1">Total</p>
-                    <p class="text-2xl font-bold text-gray-800">${stats.total || 0}</p>
-                </div>
-                <div class="bg-white rounded-xl p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase mb-1">Qualifiés</p>
-                    <p class="text-2xl font-bold text-blue-600">${stats.qualifies || 0}</p>
-                </div>
-                <div class="bg-white rounded-xl p-4 border border-amber-200">
-                    <p class="text-xs text-amber-500 uppercase mb-1">En cours</p>
-                    <p class="text-2xl font-bold text-amber-500">${stats.en_cours || 0}</p>
-                </div>
-                <div class="bg-white rounded-xl p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase mb-1">Refusés</p>
-                    <p class="text-2xl font-bold text-red-500">${stats.refuses || 0}</p>
-                </div>
-                <div class="bg-white rounded-xl p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase mb-1">Taux</p>
-                    <p class="text-2xl font-bold text-gray-600">${stats.total > 0 ? Math.round((stats.qualifies / stats.total) * 100) : 0}%</p>
-                </div>
-            </div>
-
-            ${!showClosed ? `
-            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-6">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <p class="text-sm font-medium text-gray-700">IDs d'accès au questionnaire</p>
-                        <p class="text-xs text-gray-400">Ajoutez des codes pour permettre aux participants d'accéder au questionnaire</p>
-                    </div>
-                    <button onclick="toggleAccessIdsPanel('${study.folder}')" class="px-3 py-1.5 text-sm bg-sidebar-active text-white rounded-lg hover:bg-blue-600 transition">
-                        Gérer les IDs
-                    </button>
-                </div>
-                <div id="access-ids-panel-${study.folder}" class="hidden">
-                    <div class="flex gap-2 mb-4">
-                        <input type="text" id="new-access-ids-${study.folder}" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Entrez les IDs séparés par des virgules ou retours à la ligne">
-                        <button onclick="addAccessIds('${study.folder}')" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ajouter</button>
-                    </div>
-                    <div id="access-ids-list-${study.folder}" class="max-h-40 overflow-y-auto">
-                        <p class="text-gray-400 text-sm text-center py-2">Chargement...</p>
-                    </div>
-                </div>
-            </div>
-            ` : ''}
-
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-                ${(study.quotas || []).map(q => `
-                <div class="bg-white rounded-xl p-4 border border-gray-100">
-                    <p class="text-sm font-medium text-gray-700 mb-3">${q.titre}</p>
-                    ${q.criteres.map(c => `
-                    <div class="flex items-center justify-between py-1.5">
-                        <span class="text-sm text-gray-500">${c.label}</span>
-                        <span class="text-sm font-medium ${c.atteint ? 'text-blue-600' : 'text-amber-500'}">${c.actuel}${c.objectif ? '/' + c.objectif : ''}</span>
-                    </div>
-                    `).join('')}
-                </div>
-                `).join('')}
-            </div>
-
-            <div class="bg-white rounded-xl border border-gray-100 p-4 mb-6">
-                <p class="text-sm font-medium text-gray-700 mb-3">Filtres croisés</p>
-                <div class="flex flex-wrap gap-3 mb-3" id="filter-grid-${study.studyId}">${buildCrossFilters(study)}</div>
-                <div class="flex items-center justify-between bg-sidebar text-white rounded-lg p-3">
-                    <div class="flex items-center gap-2">
-                        <span class="text-2xl font-bold" id="result-count-${study.studyId}">${qualifies.length}</span>
-                        <span class="text-sm opacity-80">résultats</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div id="active-filters-${study.studyId}" class="flex gap-1"></div>
-                        <button onclick="resetFilters('${study.studyId}')" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition">Reset</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden mb-6">
-                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <p class="font-medium text-gray-700">Participants qualifiés</p>
-                        <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">${qualifies.length}</span>
-                    </div>
-                    <button onclick="exportStudy('${study.studyId}', 'qualifies')" class="px-3 py-1.5 text-sm bg-sidebar-active text-white rounded-lg hover:bg-blue-600 transition">Exporter</button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full" id="qualifies-table-${study.studyId}">
-                        <thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr>
-                            <th class="px-4 py-3 text-left">ID</th>
-                            <th class="px-4 py-3 text-left">Nom</th>
-                            <th class="px-4 py-3 text-left">Prénom</th>
-                            <th class="px-4 py-3 text-left">Email</th>
-                            <th class="px-4 py-3 text-left">Téléphone</th>
-                            <th class="px-4 py-3 text-left">Ville</th>
-                            <th class="px-4 py-3 text-left">Horaire</th>
-                            <th class="px-4 py-3 text-left">Actions</th>
-                        </tr></thead>
-                        <tbody id="qualifies-tbody-${study.studyId}" class="divide-y divide-gray-50">
-                        </tbody>
-                    </table>
-                </div>
-                <div id="qualifies-pagination-${study.studyId}" class="px-4 py-3 border-t border-gray-100 flex items-center justify-between"></div>
-            </div>
-
-            <div class="bg-white rounded-xl border border-amber-200 overflow-hidden mb-6">
-                <div class="px-4 py-3 border-b border-amber-200 bg-amber-50 flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <p class="font-medium text-amber-700">Participants en cours</p>
-                        <span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">${(study.enCours || []).length}</span>
-                    </div>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full" id="encours-table-${study.studyId}">
-                        <thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr>
-                            <th class="px-4 py-3 text-left">ID</th>
-                            <th class="px-4 py-3 text-left">Nom</th>
-                            <th class="px-4 py-3 text-left">Prénom</th>
-                            <th class="px-4 py-3 text-left">Email</th>
-                            <th class="px-4 py-3 text-left">Téléphone</th>
-                            <th class="px-4 py-3 text-left">Questions</th>
-                            <th class="px-4 py-3 text-left">Début</th>
-                            <th class="px-4 py-3 text-left">Actions</th>
-                        </tr></thead>
-                        <tbody id="encours-tbody-${study.studyId}" class="divide-y divide-gray-50">
-                        </tbody>
-                    </table>
-                </div>
-                <div id="encours-pagination-${study.studyId}" class="px-4 py-3 border-t border-amber-200 flex items-center justify-between"></div>
-            </div>
-
-            <div class="bg-white rounded-xl border border-gray-100 overflow-hidden mb-6">
-                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <p class="font-medium text-gray-700">Participants refusés</p>
-                        <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">${refuses.length}</span>
-                    </div>
-                    <button onclick="exportStudy('${study.studyId}', 'refuses')" class="px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition">Exporter</button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full" id="refuses-table-${study.studyId}">
-                        <thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr>
-                            <th class="px-4 py-3 text-left">ID</th>
-                            <th class="px-4 py-3 text-left">Nom</th>
-                            <th class="px-4 py-3 text-left">Prénom</th>
-                            <th class="px-4 py-3 text-left">Email</th>
-                            <th class="px-4 py-3 text-left">Raison</th>
-                            <th class="px-4 py-3 text-left">Actions</th>
-                        </tr></thead>
-                        <tbody id="refuses-tbody-${study.studyId}" class="divide-y divide-gray-50">
-                        </tbody>
-                    </table>
-                </div>
-                <div id="refuses-pagination-${study.studyId}" class="px-4 py-3 border-t border-gray-100 flex items-center justify-between"></div>
-            </div>`;
-            document.getElementById('main-content').innerHTML = html;
+            // Headers différents selon le type d'étude
+            const qualifiesHeaders = isDataCollection 
+                ? `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Pseudo</th><th class="px-4 py-3 text-left">Score Qualité</th><th class="px-4 py-3 text-left">Trust Score</th><th class="px-4 py-3 text-left">Attention</th><th class="px-4 py-3 text-left">Textes</th><th class="px-4 py-3 text-left">Date</th><th class="px-4 py-3 text-left">Actions</th>`
+                : `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Nom</th><th class="px-4 py-3 text-left">Prénom</th><th class="px-4 py-3 text-left">Email</th><th class="px-4 py-3 text-left">Téléphone</th><th class="px-4 py-3 text-left">Ville</th><th class="px-4 py-3 text-left">Horaire</th><th class="px-4 py-3 text-left">Actions</th>`;
             
-            // Initialiser la pagination pour chaque tableau
-            initPagination(study.studyId, 'qualifies', qualifies);
-            initPagination(study.studyId, 'encours', study.enCours || []);
-            initPagination(study.studyId, 'refuses', refuses);
+            const encoursHeaders = isDataCollection
+                ? `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Pseudo</th><th class="px-4 py-3 text-left">Questions</th><th class="px-4 py-3 text-left">Début</th><th class="px-4 py-3 text-left">Actions</th>`
+                : `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Nom</th><th class="px-4 py-3 text-left">Prénom</th><th class="px-4 py-3 text-left">Email</th><th class="px-4 py-3 text-left">Téléphone</th><th class="px-4 py-3 text-left">Questions</th><th class="px-4 py-3 text-left">Début</th><th class="px-4 py-3 text-left">Actions</th>`;
+
+            const refusesHeaders = isDataCollection
+                ? `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Pseudo</th><th class="px-4 py-3 text-left">Raisons</th><th class="px-4 py-3 text-left">Actions</th>`
+                : `<th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Nom</th><th class="px-4 py-3 text-left">Prénom</th><th class="px-4 py-3 text-left">Email</th><th class="px-4 py-3 text-left">Téléphone</th><th class="px-4 py-3 text-left">Raisons</th><th class="px-4 py-3 text-left">Actions</th>`;
+
+            // Export bouton différent pour data_collection
+            const exportBtn = isDataCollection 
+                ? `<div class="flex gap-2"><button onclick="exportStudy('${study.studyId}', 'qualifies')" class="px-4 py-2 text-sm btn-primary rounded-lg">Export Excel</button><button onclick="exportJSONL('${study.studyId}')" class="px-4 py-2 text-sm btn-secondary rounded-lg">Export JSONL</button></div>`
+                : `<button onclick="exportStudy('${study.studyId}', 'qualifies')" class="px-4 py-2 text-sm btn-primary rounded-lg w-full sm:w-auto">Exporter</button>`;
+
+            let html = `<div class="mb-6">
+                <button onclick="switchTab('${showClosed ? 'closed' : 'studies'}')" class="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition mb-4 text-sm">← Retour aux études</button>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div><h2 class="text-xl font-semibold text-gray-800">${esc(study.studyName)}${isDataCollection ? ' <span class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full ml-2">Data Collection</span>' : ''}</h2><p class="text-sm text-gray-500">${esc(study.studyDate || '')}</p><a href="../studies/${study.folder}/" target="_blank" class="inline-flex items-center gap-1 text-sm text-sidebar-active hover:underline mt-1">Ouvrir le questionnaire →</a></div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="previewStudy('${study.folder}')" class="px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition">Prévisualiser</button>
+                        <button onclick="copyStudyLink('${study.folder}')" class="px-4 py-2 text-sm btn-secondary rounded-lg">Copier le lien</button>
+                        ${!showClosed ? `<button onclick="closeStudy('${study.folder}')" class="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">Terminer</button>` : `<button onclick="reopenStudy('${study.folder}')" class="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition">Réouvrir</button>${userRole === 'super_admin' ? `<button onclick="deleteStudy('${study.folder}', '${esc(study.studyName).replace(/'/g, "\\'")}')" class="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition">🗑 Supprimer</button>` : ''}`}
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
+                <div class="card p-4"><p class="text-xs text-gray-400 uppercase mb-1">Total</p><p class="text-xl md:text-2xl font-bold text-gray-800">${stats.total || 0}</p></div>
+                <div class="card p-4"><p class="text-xs text-gray-400 uppercase mb-1">${isDataCollection ? 'Complétés' : 'Qualifiés'}</p><p class="text-xl md:text-2xl font-bold text-blue-600">${stats.qualifies || 0}</p></div>
+                <div class="card p-4 border-amber-200"><p class="text-xs text-amber-500 uppercase mb-1">En cours</p><p class="text-xl md:text-2xl font-bold text-amber-500">${stats.en_cours || 0}</p></div>
+                <div class="card p-4"><p class="text-xs text-gray-400 uppercase mb-1">${isDataCollection ? 'Abandons' : 'Refusés'}</p><p class="text-xl md:text-2xl font-bold text-red-500">${stats.refuses || 0}</p></div>
+                <div class="card p-4 col-span-2 sm:col-span-1"><p class="text-xs text-gray-400 uppercase mb-1">Taux</p><p class="text-xl md:text-2xl font-bold text-gray-600">${stats.total > 0 ? Math.round((stats.qualifies / stats.total) * 100) : 0}%</p></div>
+            </div>
+            ${!showClosed && canEdit && !isDataCollection ? `<div class="card p-4 mb-6"><div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4"><div><p class="text-sm font-medium text-gray-700">IDs d'accès au questionnaire</p><p class="text-xs text-gray-400">Codes pour permettre aux participants d'accéder</p></div><button onclick="toggleAccessIdsPanel('${study.folder}')" class="px-4 py-2 text-sm btn-primary rounded-lg w-full sm:w-auto">Gérer les IDs</button></div><div id="access-ids-panel-${study.folder}" class="hidden"><div class="flex flex-col sm:flex-row gap-2 mb-4"><input type="text" id="new-access-ids-${study.folder}" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="IDs séparés par virgules"><button onclick="addAccessIds('${study.folder}')" class="px-4 py-2 text-sm btn-primary rounded-lg">Ajouter</button></div><div id="access-ids-list-${study.folder}" class="max-h-40 overflow-y-auto"><p class="text-gray-400 text-sm text-center py-2">Chargement...</p></div></div></div>` : ''}
+            ${!isDataCollection ? `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mb-6">${(study.quotas || []).map(q => `<div class="card p-4"><p class="text-sm font-medium text-gray-700 mb-3">${q.titre}</p>${q.criteres.map(c => `<div class="flex items-center justify-between py-1.5"><span class="text-sm text-gray-500">${c.label}</span><span class="text-sm font-medium ${c.atteint ? 'text-blue-600' : 'text-amber-500'}">${c.actuel}${c.objectif ? '/' + c.objectif : ''}</span></div>`).join('')}</div>`).join('')}</div>` : ''}
+            ${!isDataCollection ? `<div class="card p-4 mb-6"><p class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>Filtres croisés</p><div class="filters-wrapper mb-4"><div class="filters-grid" id="filter-grid-${study.studyId}">${buildCrossFilters(study)}</div></div><div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-sidebar text-white rounded-lg p-3"><div class="flex items-center gap-2"><span class="text-2xl font-bold" id="result-count-${study.studyId}">${qualifies.length}</span><span class="text-sm opacity-80">résultats</span></div><div class="flex flex-wrap items-center gap-2 w-full sm:w-auto"><div id="active-filters-${study.studyId}" class="flex flex-wrap gap-1"></div><button onclick="resetFilters('${study.studyId}')" class="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>Reset</button></div></div></div>` : ''}
+            <div class="card overflow-hidden mb-6"><div class="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div class="flex items-center gap-2"><p class="font-medium text-gray-700">${isDataCollection ? 'Réponses complétées' : 'Participants qualifiés'}</p><span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">${qualifies.length}</span></div>${exportBtn}</div><div class="table-responsive"><table class="w-full min-w-[700px]" id="qualifies-table-${study.studyId}" data-study-type="${study.studyType || 'classic'}"><thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr>${qualifiesHeaders}</tr></thead><tbody id="qualifies-tbody-${study.studyId}" class="divide-y divide-gray-50"></tbody></table></div><div id="qualifies-pagination-${study.studyId}" class="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2"></div></div>
+            <div class="card border-amber-200 overflow-hidden mb-6"><div class="px-4 py-3 border-b border-amber-200 bg-amber-50 flex items-center gap-2"><span class="text-amber-500">⏱</span><p class="font-medium text-amber-700">Participants en cours</p><span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">${(study.enCours || []).length}</span></div><div class="table-responsive"><table class="w-full min-w-[700px]" id="encours-table-${study.studyId}" data-study-type="${study.studyType || 'classic'}"><thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr>${encoursHeaders}</tr></thead><tbody id="encours-tbody-${study.studyId}" class="divide-y divide-gray-50"></tbody></table></div><div id="encours-pagination-${study.studyId}" class="px-4 py-3 border-t border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-2"></div></div>
+            <div class="card overflow-hidden mb-6"><div class="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div class="flex items-center gap-2"><p class="font-medium text-gray-700">${isDataCollection ? 'Abandons' : 'Participants refusés'}</p><span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">${refuses.length}</span></div><button onclick="exportStudy('${study.studyId}', 'refuses')" class="px-4 py-2 text-sm btn-secondary rounded-lg w-full sm:w-auto">Exporter ${isDataCollection ? 'abandons' : 'refusés'}</button></div><div class="table-responsive"><table class="w-full min-w-[700px]" id="refuses-table-${study.studyId}" data-study-type="${study.studyType || 'classic'}"><thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr>${refusesHeaders}</tr></thead><tbody id="refuses-tbody-${study.studyId}" class="divide-y divide-gray-50"></tbody></table></div><div id="refuses-pagination-${study.studyId}" class="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2"></div></div>`;
+            document.getElementById('main-content').innerHTML = html;
+            initPaginatedTables(study);
         }
 
-        function esc(t) { if (t === null || t === undefined) return '-'; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+        const ITEMS_PER_PAGE = 15;
+        const paginationData = {};
 
-        function formatDate(dateStr) {
-            if (!dateStr || dateStr === 'N/A') return '-';
-            try {
-                const date = new Date(dateStr);
-                return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-            } catch (e) {
-                return dateStr;
-            }
-        }
-
-        // ===== SYSTÈME DE PAGINATION =====
-        const ITEMS_PER_PAGE = 10;
-        let paginationData = {};
-
-        function initPagination(studyId, type, data) {
-            const key = `${studyId}_${type}`;
-            paginationData[key] = {
-                data: data,
-                currentPage: 1,
-                totalPages: Math.ceil(data.length / ITEMS_PER_PAGE) || 1
-            };
-            renderPaginatedTable(studyId, type);
+        function initPaginatedTables(study) {
+            ['qualifies', 'refuses', 'enCours'].forEach(type => {
+                const data = study[type] || [];
+                paginationData[`${study.studyId}_${type}`] = { data, currentPage: 1, totalPages: Math.ceil(data.length / ITEMS_PER_PAGE) || 1 };
+                renderPaginatedTable(study.studyId, type);
+            });
         }
 
         function renderPaginatedTable(studyId, type) {
-            const key = `${studyId}_${type}`;
-            const pd = paginationData[key];
+            const key = `${studyId}_${type}`, pd = paginationData[key];
             if (!pd) return;
-
-            const start = (pd.currentPage - 1) * ITEMS_PER_PAGE;
-            const end = start + ITEMS_PER_PAGE;
-            const pageData = pd.data.slice(start, end);
-
-            const tbody = document.getElementById(type + '-tbody-' + studyId);
-            const paginationDiv = document.getElementById(type + '-pagination-' + studyId);
+            const start = (pd.currentPage - 1) * ITEMS_PER_PAGE, end = start + ITEMS_PER_PAGE, pageData = pd.data.slice(start, end);
+            const tbody = document.getElementById(`${type}-tbody-${studyId}`);
+            if (!tbody) return;
             
-            if (!tbody) {
-                console.error('tbody non trouvé:', type + '-tbody-' + studyId);
-                return;
-            }
+            // Détecter le type d'étude
+            const table = document.getElementById(`${type}-table-${studyId}`);
+            const isDataCollection = table && table.dataset.studyType === 'data_collection';
 
-            // Générer les lignes du tableau selon le type
-            if (pageData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Aucun</td></tr>';
-            } else {
-                let rows = '';
-                pageData.forEach((p, i) => {
-                    const realIndex = start + i;
-                    const nom = esc(p.nom || '');
-                    const prenom = esc(p.prenom || '');
-                    const email = esc(p.email || '');
-                    const telephone = esc(p.telephone || '');
-                    const accessId = esc(p.accessId || '-');
-                    const ville = esc(p.ville || '');
-                    const horaire = esc(p.horaire || '');
-                    const pid = p.id || '';
-                    const fullName = (prenom + ' ' + nom).replace(/'/g, "\\'");
-                    
-                    if (type === 'qualifies') {
-                        rows += '<tr data-index="' + realIndex + '" class="hover:bg-gray-50">' +
-                            '<td class="px-4 py-3"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">' + accessId + '</span></td>' +
-                            '<td class="px-4 py-3 font-medium text-gray-800">' + nom + '</td>' +
-                            '<td class="px-4 py-3 text-gray-600">' + prenom + '</td>' +
-                            '<td class="px-4 py-3 text-sm text-gray-500">' + email + '</td>' +
-                            '<td class="px-4 py-3 text-sm text-gray-600">' + telephone + '</td>' +
-                            '<td class="px-4 py-3 text-sm text-gray-600">' + ville + '</td>' +
-                            '<td class="px-4 py-3 text-sm font-medium text-gray-800">' + horaire + '</td>' +
-                            '<td class="px-4 py-3"><div class="flex gap-1">' +
-                                '<button onclick="showResponses(\'' + studyId + '\', ' + realIndex + ', \'qualifies\')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>' +
-                                '<button onclick="deleteParticipant(\'' + studyId + '\', \'' + pid + '\', \'' + fullName + '\')" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>' +
-                            '</div></td>' +
-                        '</tr>';
-                    } else if (type === 'encours') {
-                        const questions = p.questionsRepondues || 0;
-                        const dateDebut = formatDate(p.dateDebut);
-                        rows += '<tr class="hover:bg-amber-50">' +
-                            '<td class="px-4 py-3"><span class="px-2 py-0.5 bg-amber-100 rounded text-xs font-mono">' + accessId + '</span></td>' +
-                            '<td class="px-4 py-3 font-medium text-gray-800">' + nom + '</td>' +
-                            '<td class="px-4 py-3 text-gray-600">' + prenom + '</td>' +
-                            '<td class="px-4 py-3 text-sm text-gray-500">' + email + '</td>' +
-                            '<td class="px-4 py-3 text-sm text-gray-600">' + telephone + '</td>' +
-                            '<td class="px-4 py-3"><span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded">' + questions + ' répondue(s)</span></td>' +
-                            '<td class="px-4 py-3 text-sm text-gray-500">' + dateDebut + '</td>' +
-                            '<td class="px-4 py-3"><div class="flex gap-1">' +
-                                '<button onclick="showResponses(\'' + studyId + '\', ' + realIndex + ', \'enCours\')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>' +
-                                '<button onclick="deleteParticipant(\'' + studyId + '\', \'' + pid + '\', \'' + fullName + '\')" class="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>' +
-                            '</div></td>' +
-                        '</tr>';
-                    } else if (type === 'refuses') {
-                        const raisons = (p.raisons || []).join(', ');
-                        rows += '<tr class="hover:bg-gray-50">' +
-                            '<td class="px-4 py-3"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">' + accessId + '</span></td>' +
-                            '<td class="px-4 py-3 font-medium text-gray-800">' + nom + '</td>' +
-                            '<td class="px-4 py-3 text-gray-600">' + prenom + '</td>' +
-                            '<td class="px-4 py-3 text-sm text-gray-500">' + email + '</td>' +
-                            '<td class="px-4 py-3 text-sm text-red-500">' + raisons + '</td>' +
-                            '<td class="px-4 py-3"><div class="flex gap-1">' +
-                                '<button onclick="showResponses(\'' + studyId + '\', ' + realIndex + ', \'refuses\')" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">Voir</button>' +
-                                '<button onclick="acceptParticipant(\'' + studyId + '\', \'' + pid + '\', \'' + fullName + '\')" class="px-2 py-1 text-xs text-green-600 bg-green-50 hover:bg-green-100 rounded transition">Accepter</button>' +
-                            '</div></td>' +
-                        '</tr>';
-                    }
-                });
-                tbody.innerHTML = rows;
-            }
-
-            // Générer la pagination
-            if (paginationDiv) {
-                if (pd.data.length <= ITEMS_PER_PAGE) {
-                    paginationDiv.innerHTML = `<span class="text-sm text-gray-500">${pd.data.length} élément(s)</span>`;
+            if (type === 'qualifies') {
+                if (isDataCollection) {
+                    // Rendu spécial pour data_collection
+                    tbody.innerHTML = pageData.map((p, i) => { 
+                        const gi = start + i;
+                        const qd = p.qualityData || {};
+                        const trustScore = qd.trustScore || (p.behaviorMetrics?.trustScore) || '-';
+                        const qualityScore = qd.overallQualityScore || '-';
+                        const attChecks = `${qd.attentionChecksPassed || 0}/${qd.attentionChecksTotal || 0}`;
+                        const textCount = qd.totalTextResponses || Object.keys(p.reponses || {}).filter(k => {
+                            const v = p.reponses[k];
+                            return v && v.value && typeof v.value === 'string' && v.value.length > 50;
+                        }).length;
+                        const pseudo = p.nom !== 'N/A' ? p.nom : (p.email ? p.email.split('@')[0] : `P${(gi+1).toString().padStart(3,'0')}`);
+                        const dateStr = p.date && p.date !== 'N/A' ? new Date(p.date).toLocaleDateString('fr-FR') : '-';
+                        
+                        // Couleurs pour les scores
+                        const qsColor = qualityScore >= 80 ? 'text-green-600' : qualityScore >= 50 ? 'text-amber-600' : 'text-red-600';
+                        const tsColor = trustScore !== '-' ? (trustScore >= 70 ? 'text-green-600' : trustScore >= 50 ? 'text-amber-600' : 'text-red-600') : 'text-gray-400';
+                        const attColor = qd.attentionChecksPassed === qd.attentionChecksTotal ? 'text-green-600' : 'text-red-600';
+                        
+                        return `<tr data-index="${gi}" class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-sm text-sidebar-active font-mono">P${(gi+1).toString().padStart(3,'0')}</td>
+                            <td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(pseudo)}</td>
+                            <td class="px-4 py-3 text-sm font-bold ${qsColor}">${qualityScore}%</td>
+                            <td class="px-4 py-3 text-sm font-medium ${tsColor}">${trustScore}</td>
+                            <td class="px-4 py-3 text-sm font-medium ${attColor}">${attChecks}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600">${textCount}</td>
+                            <td class="px-4 py-3 text-sm text-gray-500">${dateStr}</td>
+                            <td class="px-4 py-3"><div class="flex gap-1"><button onclick="showResponses('${studyId}', ${gi}, 'qualifies')" class="px-3 py-1 text-xs btn-secondary rounded">Voir</button>${canEdit ? `<button onclick="deleteParticipant('${studyId}', '${p.id}', 'qualifies')" class="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>` : ''}</div></td>
+                        </tr>`;
+                    }).join('');
                 } else {
-                    const startNum = start + 1;
-                    const endNum = Math.min(end, pd.data.length);
-                    
-                    let pagesHtml = '';
-                    for (let i = 1; i <= pd.totalPages; i++) {
-                        if (i === pd.currentPage) {
-                            pagesHtml += `<button class="px-3 py-1 text-sm bg-sidebar-active text-white rounded">${i}</button>`;
-                        } else {
-                            pagesHtml += `<button onclick="goToPage('${studyId}', '${type}', ${i})" class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition">${i}</button>`;
-                        }
-                    }
+                    // Rendu classique
+                    tbody.innerHTML = pageData.map((p, i) => { const gi = start + i; return `<tr data-index="${gi}" class="hover:bg-gray-50"><td class="px-4 py-3 text-sm text-sidebar-active font-mono">${p.accessId || (gi + 1).toString().padStart(3, '0')}</td><td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(p.nom)}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.prenom)}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.email)}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.telephone || '')}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.ville || '')}</td><td class="px-4 py-3 text-sm font-medium text-gray-700">${esc(p.horaire || '')}</td><td class="px-4 py-3"><div class="flex gap-1"><button onclick="showResponses('${studyId}', ${gi}, 'qualifies')" class="px-3 py-1 text-xs btn-secondary rounded">Voir</button>${canEdit ? `<button onclick="deleteParticipant('${studyId}', '${p.id}', 'qualifies')" class="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>` : ''}</div></td></tr>`; }).join('');
+                }
+            } else if (type === 'enCours') {
+                if (isDataCollection) {
+                    tbody.innerHTML = pageData.map((p, i) => { 
+                        const gi = start + i;
+                        const qc = p.reponses ? Object.keys(p.reponses).length : 0;
+                        const pseudo = p.nom !== 'N/A' ? p.nom : (p.email ? p.email.split('@')[0] : '-');
+                        return `<tr data-index="${gi}" class="hover:bg-amber-50">
+                            <td class="px-4 py-3 text-sm text-amber-600 font-mono">${p.id ? p.id.substring(0,8) : '-'}</td>
+                            <td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(pseudo)}</td>
+                            <td class="px-4 py-3 text-sm text-amber-600 font-medium">${qc} réponse(s)</td>
+                            <td class="px-4 py-3 text-sm text-gray-500">${p.dateDebut && p.dateDebut !== 'N/A' ? new Date(p.dateDebut).toLocaleString('fr-FR') : '-'}</td>
+                            <td class="px-4 py-3"><button onclick="showResponses('${studyId}', ${gi}, 'enCours')" class="px-3 py-1 text-xs btn-secondary rounded">Voir</button></td>
+                        </tr>`;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = pageData.map((p, i) => { const gi = start + i, qc = p.reponses ? Object.keys(p.reponses).length : 0; return `<tr data-index="${gi}" class="hover:bg-amber-50"><td class="px-4 py-3 text-sm text-amber-600 font-mono">${p.accessId || '-'}</td><td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(p.nom || '-')}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.prenom || '-')}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.email || '-')}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.telephone || '-')}</td><td class="px-4 py-3 text-sm text-amber-600 font-medium">${qc} réponse(s)</td><td class="px-4 py-3 text-sm text-gray-500">${p.date ? new Date(p.date).toLocaleString('fr-FR') : '-'}</td><td class="px-4 py-3"><button onclick="showResponses('${studyId}', ${gi}, 'enCours')" class="px-3 py-1 text-xs btn-secondary rounded">Voir</button></td></tr>`; }).join('');
+                }
+            } else if (type === 'refuses') {
+                if (isDataCollection) {
+                    tbody.innerHTML = pageData.map((p, i) => { 
+                        const gi = start + i;
+                        const pseudo = p.nom !== 'N/A' ? p.nom : (p.email ? p.email.split('@')[0] : '-');
+                        return `<tr data-index="${gi}" class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-sm text-gray-400 font-mono">${p.id ? p.id.substring(0,8) : '-'}</td>
+                            <td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(pseudo)}</td>
+                            <td class="px-4 py-3 text-sm text-red-500">${(p.raisons||[]).join(', ') || 'Abandonné'}</td>
+                            <td class="px-4 py-3"><button onclick="showResponses('${studyId}', ${gi}, 'refuses')" class="px-3 py-1 text-xs btn-secondary rounded">Voir</button></td>
+                        </tr>`;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = pageData.map((p, i) => { const gi = start + i; return `<tr data-index="${gi}" class="hover:bg-gray-50"><td class="px-4 py-3 text-sm text-gray-400 font-mono">${p.accessId || '-'}</td><td class="px-4 py-3 text-sm font-medium text-gray-800">${esc(p.nom || '-')}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.prenom || '-')}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.email || '-')}</td><td class="px-4 py-3 text-sm text-gray-600">${esc(p.telephone || '-')}</td><td class="px-4 py-3 text-sm text-red-500">${(p.raisons||[]).join(', ') || '-'}</td><td class="px-4 py-3"><div class="flex flex-col sm:flex-row gap-1"><button onclick="showResponses('${studyId}', ${gi}, 'refuses')" class="px-3 py-1 text-xs btn-secondary rounded">Voir</button>${canEdit ? `<button onclick="moveToQualified('${studyId}', '${p.id}')" class="px-3 py-1 text-xs text-green-600 hover:bg-green-50 rounded transition">Qualifier</button>` : ''}</div></td></tr>`; }).join('');
+                }
+            }
 
-                    paginationDiv.innerHTML = `
-                        <span class="text-sm text-gray-500">${startNum}-${endNum} sur ${pd.data.length}</span>
-                        <div class="flex items-center gap-1">
-                            <button onclick="goToPage('${studyId}', '${type}', ${pd.currentPage - 1})" ${pd.currentPage === 1 ? 'disabled' : ''} class="px-2 py-1 text-sm ${pd.currentPage === 1 ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'} rounded transition">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                            </button>
-                            ${pagesHtml}
-                            <button onclick="goToPage('${studyId}', '${type}', ${pd.currentPage + 1})" ${pd.currentPage === pd.totalPages ? 'disabled' : ''} class="px-2 py-1 text-sm ${pd.currentPage === pd.totalPages ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'} rounded transition">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            </button>
-                        </div>
-                    `;
+            const paginationDiv = document.getElementById(`${type}-pagination-${studyId}`);
+            if (paginationDiv) {
+                if (pd.data.length <= ITEMS_PER_PAGE) { paginationDiv.innerHTML = `<span class="text-sm text-gray-500">${pd.data.length} élément(s)</span>`; }
+                else {
+                    let pagesHtml = '';
+                    for (let i = 1; i <= pd.totalPages; i++) { pagesHtml += i === pd.currentPage ? `<button class="px-3 py-1 text-sm btn-primary rounded">${i}</button>` : `<button onclick="goToPage('${studyId}', '${type}', ${i})" class="px-3 py-1 text-sm btn-secondary rounded">${i}</button>`; }
+                    paginationDiv.innerHTML = `<span class="text-sm text-gray-500">${start + 1}-${Math.min(end, pd.data.length)} sur ${pd.data.length}</span><div class="flex items-center gap-1 flex-wrap"><button onclick="goToPage('${studyId}', '${type}', ${pd.currentPage - 1})" ${pd.currentPage === 1 ? 'disabled' : ''} class="px-3 py-1 text-sm ${pd.currentPage === 1 ? 'text-gray-300' : 'btn-secondary'} rounded">←</button>${pagesHtml}<button onclick="goToPage('${studyId}', '${type}', ${pd.currentPage + 1})" ${pd.currentPage === pd.totalPages ? 'disabled' : ''} class="px-3 py-1 text-sm ${pd.currentPage === pd.totalPages ? 'text-gray-300' : 'btn-secondary'} rounded">→</button></div>`;
                 }
             }
         }
 
         function goToPage(studyId, type, page) {
-            const key = `${studyId}_${type}`;
-            const pd = paginationData[key];
-            if (!pd) return;
-            if (page < 1 || page > pd.totalPages) return;
+            const key = `${studyId}_${type}`, pd = paginationData[key];
+            if (!pd || page < 1 || page > pd.totalPages) return;
             pd.currentPage = page;
             renderPaginatedTable(studyId, type);
         }
 
         let studyQuestionTitles = {};
-
+        const studyQuestionData = {};
+        
         async function loadStudyQuestions(folder) {
-            if (studyQuestionTitles[folder]) return studyQuestionTitles[folder];
+            if (studyQuestionData[folder]) return studyQuestionData[folder];
             try {
-                // Ajouter timestamp pour éviter le cache
                 const response = await fetch('../studies/' + folder + '/questions.js?v=' + Date.now());
                 const jsContent = await response.text();
-                const titles = {};
+                const data = { titles: {}, options: {}, optionLabels: {}, order: [], fields: {} };
                 
-                // Parser toutes les questions pour extraire les IDs et titres
-                // Méthode améliorée: chercher chaque bloc de question
-                const regex = /id:\s*['"]([^'"]+)['"][^}]*?(?:title|question):\s*['"]([^'"]+)['"]/gs;
-                let match;
-                while ((match = regex.exec(jsContent)) !== null) {
-                    const id = match[1];
-                    const title = match[2].replace(/<[^>]*>/g, '').trim();
-                    if (title) {
-                        titles[id] = title.substring(0, 35);
+                // Parser le contenu JS pour extraire les questions
+                const questionBlocks = jsContent.split(/\{\s*id:/);
+                
+                questionBlocks.forEach(block => {
+                    if (!block.trim()) return;
+                    
+                    // Extraire l'ID
+                    const idMatch = block.match(/^\s*['"]([^'"]+)['"]/);
+                    if (!idMatch) return;
+                    const qId = idMatch[1];
+                    
+                    // Ajouter à l'ordre
+                    data.order.push(qId);
+                    
+                    // Extraire le titre (gérer les apostrophes échappées)
+                    // Chercher title: '...' ou title: "..."
+                    let title = null;
+                    const titleMatch1 = block.match(/title:\s*'((?:[^'\\]|\\.)*)'/);
+                    const titleMatch2 = block.match(/title:\s*"((?:[^"\\]|\\.)*)"/);
+                    if (titleMatch1) title = titleMatch1[1].replace(/\\'/g, "'");
+                    else if (titleMatch2) title = titleMatch2[1].replace(/\\"/g, '"');
+                    
+                    // Si pas de title, chercher question
+                    if (!title) {
+                        const questionMatch1 = block.match(/question:\s*'((?:[^'\\]|\\.)*)'/);
+                        const questionMatch2 = block.match(/question:\s*"((?:[^"\\]|\\.)*)"/);
+                        if (questionMatch1) title = questionMatch1[1].replace(/\\'/g, "'");
+                        else if (questionMatch2) title = questionMatch2[1].replace(/\\"/g, '"');
                     }
-                }
+                    
+                    data.titles[qId] = title ? title.replace(/<[^>]*>/g, '').trim() : qId;
+                    
+                    // Extraire les fields pour double_text
+                    const fieldsMatch = block.match(/fields:\s*\[([\s\S]*?)\]/);
+                    if (fieldsMatch) {
+                        const fieldsStr = fieldsMatch[1];
+                        const fields = {};
+                        // Gérer les apostrophes échappées dans les labels
+                        const fieldRegex = /key:\s*['"]([^'"]+)['"][\s\S]*?label:\s*'((?:[^'\\]|\\.)*)'/g;
+                        let fMatch;
+                        while ((fMatch = fieldRegex.exec(fieldsStr)) !== null) {
+                            fields[fMatch[1]] = fMatch[2].replace(/\\'/g, "'");
+                        }
+                        // Essayer aussi avec guillemets doubles
+                        const fieldRegex2 = /key:\s*['"]([^'"]+)['"][\s\S]*?label:\s*"((?:[^"\\]|\\.)*)"/g;
+                        while ((fMatch = fieldRegex2.exec(fieldsStr)) !== null) {
+                            fields[fMatch[1]] = fMatch[2].replace(/\\"/g, '"');
+                        }
+                        if (Object.keys(fields).length > 0) {
+                            data.fields[qId] = fields;
+                        }
+                    }
+                    
+                    // Extraire les options avec leurs labels
+                    const optionsMatch = block.match(/options:\s*\[([\s\S]*?)\]/);
+                    if (optionsMatch) {
+                        const optionsStr = optionsMatch[1];
+                        const opts = [];
+                        const labels = {};
+                        
+                        // Chercher les paires value/label (gérer apostrophes échappées)
+                        const pairRegex = /value:\s*['"]([^'"]+)['"][\s\S]*?label:\s*'((?:[^'\\]|\\.)*)'/g;
+                        let match;
+                        while ((match = pairRegex.exec(optionsStr)) !== null) {
+                            opts.push(match[1]);
+                            labels[match[1]] = match[2].replace(/\\'/g, "'");
+                        }
+                        
+                        // Essayer aussi avec guillemets doubles pour label
+                        if (opts.length === 0) {
+                            const pairRegex2 = /value:\s*['"]([^'"]+)['"][\s\S]*?label:\s*"((?:[^"\\]|\\.)*)"/g;
+                            while ((match = pairRegex2.exec(optionsStr)) !== null) {
+                                opts.push(match[1]);
+                                labels[match[1]] = match[2].replace(/\\"/g, '"');
+                            }
+                        }
+                        
+                        if (opts.length > 0 && opts.length <= 50) {
+                            data.options[qId] = opts;
+                            data.optionLabels[qId] = labels;
+                        }
+                    }
+                });
                 
-                console.log('Titres chargés pour', folder, ':', titles);
-                studyQuestionTitles[folder] = titles;
-                return titles;
-            } catch (e) {
+                studyQuestionData[folder] = data;
+                studyQuestionTitles[folder] = data.titles;
+                return data;
+            } catch (e) { 
                 console.error('Erreur chargement questions:', e);
-                return {};
+                return { titles: {}, options: {}, optionLabels: {}, order: [], fields: {} }; 
             }
         }
 
         async function initFiltersForStudy(study) {
-            const titles = await loadStudyQuestions(study.folder);
+            const data = await loadStudyQuestions(study.folder);
             const container = document.getElementById('filter-grid-' + study.studyId);
-            if (container) {
-                container.innerHTML = buildCrossFiltersSync(study, titles);
-            }
+            if (container) container.innerHTML = buildCrossFiltersSync(study, data);
         }
 
-        function buildCrossFilters(study) {
-            // Retourner un placeholder, puis charger les vrais filtres
-            setTimeout(() => initFiltersForStudy(study), 100);
-            return '<p class="text-gray-400 text-sm">Chargement des filtres...</p>';
-        }
+        function buildCrossFilters(study) { setTimeout(() => initFiltersForStudy(study), 100); return '<p class="text-gray-400 text-sm">Chargement des filtres...</p>'; }
 
-        function buildCrossFiltersSync(study, titles) {
-            const allParticipants = [...(study.qualifies || []), ...(study.refuses || [])];
-            if (allParticipants.length === 0) return '<p class="text-gray-400 text-sm">Aucune donnée pour les filtres</p>';
+        function buildCrossFiltersSync(study, data) {
+            const titles = data.titles || {};
+            const questionOptions = data.options || {};
             
-            // Collecter toutes les options possibles pour chaque question
-            const opts = {};
-            allParticipants.forEach(p => { 
-                if (!p.reponses) return; 
-                Object.entries(p.reponses).forEach(([id, a]) => { 
-                    // Ignorer les questions de type fichier/photo
-                    if (a.file) return;
-                    if (!opts[id]) opts[id] = new Set(); 
-                    if (a.value !== undefined) {
-                        opts[id].add(String(a.value)); 
-                    } else if (a.values && Array.isArray(a.values)) {
-                        a.values.forEach(v => opts[id].add(String(v))); 
-                    }
-                }); 
-            });
-            
-            // Trier les questions par ordre numérique
-            const sortedQuestions = Object.keys(opts).sort((a, b) => {
+            // Construire la liste des questions à afficher (celles qui ont des options)
+            const sortedQuestions = Object.keys(questionOptions).sort((a, b) => { 
                 const numA = parseInt(a.replace(/\D/g, '')) || 0;
-                const numB = parseInt(b.replace(/\D/g, '')) || 0;
-                return numA - numB || a.localeCompare(b);
+                const numB = parseInt(b.replace(/\D/g, '')) || 0; 
+                return numA - numB || a.localeCompare(b); 
             });
+            
+            if (sortedQuestions.length === 0) return '<p class="text-gray-400 text-sm">Aucun filtre disponible</p>';
             
             let html = '';
-            sortedQuestions.forEach(qId => {
-                if (!opts[qId] || opts[qId].size === 0) return;
-                // Limiter aux questions avec moins de 20 options distinctes
-                if (opts[qId].size > 20) return;
+            sortedQuestions.forEach(qId => { 
+                const options = questionOptions[qId];
+                if (!options || options.length === 0) return;
                 
                 const title = titles[qId] || qId;
-                const options = Array.from(opts[qId]).sort().map(o => 
-                    `<option value="${o}">${o.replace(/_/g, ' ')}</option>`
-                ).join('');
+                const shortTitle = title.length > 20 ? title.substring(0, 18) + '...' : title;
+                const optionsHtml = options.map(o => `<label class="multi-select-option"><input type="checkbox" value="${esc(o)}" onchange="applyFilters('${study.studyId}')"><span>${esc(o.replace(/_/g, ' '))}</span></label>`).join('');
                 
-                html += `<select class="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm min-w-[120px]" 
-                    data-study="${study.studyId}" data-question="${qId}" onchange="applyFilters('${study.studyId}')"
-                    title="${esc(title)}">
-                    <option value="">${esc(title)}</option>${options}</select>`;
+                html += `<div class="multi-select-container" data-study="${study.studyId}" data-question="${qId}">
+                    <button type="button" class="multi-select-btn" onclick="toggleMultiSelect(this)" title="${esc(title)}">
+                        <span class="truncate">${esc(shortTitle)}</span>
+                        <svg class="arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="multi-select-dropdown">${optionsHtml}</div>
+                </div>`; 
             });
-            
             return html || '<p class="text-gray-400 text-sm">Aucun filtre disponible</p>';
         }
 
+        function toggleMultiSelect(btn) {
+            const dropdown = btn.nextElementSibling;
+            const isOpen = dropdown.classList.contains('show');
+            
+            // Fermer tous les autres dropdowns ouverts
+            document.querySelectorAll('.multi-select-dropdown.show').forEach(d => {
+                d.classList.remove('show');
+                d.previousElementSibling.classList.remove('open');
+            });
+            
+            if (!isOpen) {
+                dropdown.classList.add('show');
+                btn.classList.add('open');
+            }
+        }
+        
+        // Fermer dropdown quand on clique ailleurs
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.multi-select-container')) {
+                document.querySelectorAll('.multi-select-dropdown.show').forEach(d => {
+                    d.classList.remove('show');
+                    d.previousElementSibling.classList.remove('open');
+                });
+            }
+        });
+
         function applyFilters(studyId) {
             const study = allData.studies.find(s => s.studyId === studyId); if (!study) return;
-            const sels = document.querySelectorAll(`select[data-study="${studyId}"]`);
+            const containers = document.querySelectorAll(`.multi-select-container[data-study="${studyId}"]`);
             const filters = {};
             const tags = [];
             
-            sels.forEach(s => { 
-                if (s.value) { 
-                    filters[s.dataset.question] = s.value; 
-                    tags.push(s.value.replace(/_/g, ' ')); 
-                } 
+            containers.forEach(container => {
+                const qId = container.dataset.question;
+                const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+                const btn = container.querySelector('.multi-select-btn');
+                
+                if (checkboxes.length > 0) {
+                    filters[qId] = Array.from(checkboxes).map(cb => cb.value);
+                    btn.classList.add('active');
+                    // Ajouter badge avec le nombre
+                    let badge = btn.querySelector('.multi-select-badge');
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'multi-select-badge';
+                        btn.insertBefore(badge, btn.querySelector('.arrow'));
+                    }
+                    badge.textContent = checkboxes.length;
+                    // Ajouter tags pour affichage
+                    checkboxes.forEach(cb => {
+                        tags.push({ qId: qId, value: cb.value, label: cb.value.replace(/_/g, ' ') });
+                    });
+                } else {
+                    btn.classList.remove('active');
+                    const badge = btn.querySelector('.multi-select-badge');
+                    if (badge) badge.remove();
+                }
             });
             
             let count = 0;
-            study.qualifies.forEach((p, i) => {
+            const qualifiesData = paginationData[`${studyId}_qualifies`]?.data || study.qualifies;
+            qualifiesData.forEach((p, i) => {
                 let match = true;
-                
-                Object.entries(filters).forEach(([qId, val]) => { 
+                Object.entries(filters).forEach(([qId, vals]) => { 
                     const a = p.reponses?.[qId]; 
-                    if (!a) { 
-                        match = false; 
-                        return; 
-                    } 
+                    if (!a) { match = false; return; } 
                     if (a.value !== undefined) { 
-                        if (String(a.value) !== val) match = false; 
+                        if (!vals.includes(String(a.value))) match = false; 
                     } else if (a.values && Array.isArray(a.values)) { 
-                        if (!a.values.map(String).includes(val)) match = false; 
+                        // Pour les questions multi, vérifier si au moins une valeur sélectionnée est dans les réponses
+                        const hasMatch = vals.some(v => a.values.map(String).includes(v));
+                        if (!hasMatch) match = false;
                     } else { 
                         match = false; 
                     } 
                 });
-                
                 const row = document.querySelector(`#qualifies-table-${studyId} tr[data-index="${i}"]`);
                 if (row) row.classList.toggle('hidden-by-filter', !match);
                 if (match) count++;
             });
             
             document.getElementById(`result-count-${studyId}`).textContent = count;
-            document.getElementById(`active-filters-${studyId}`).innerHTML = tags.map(t => 
-                `<span class="px-2 py-0.5 bg-white/20 rounded text-xs">${t}</span>`
+            
+            // Afficher les tags des filtres actifs
+            const tagsHtml = tags.map(t => 
+                `<span class="filter-tag">
+                    <span>${esc(t.label)}</span>
+                    <span class="filter-tag-remove" onclick="removeFilter('${studyId}', '${t.qId}', '${esc(t.value)}')">✕</span>
+                </span>`
             ).join('');
+            document.getElementById(`active-filters-${studyId}`).innerHTML = tagsHtml;
+        }
+        
+        function removeFilter(studyId, qId, value) {
+            const container = document.querySelector(`.multi-select-container[data-study="${studyId}"][data-question="${qId}"]`);
+            if (container) {
+                const checkbox = container.querySelector(`input[type="checkbox"][value="${value}"]`);
+                if (checkbox) {
+                    checkbox.checked = false;
+                    applyFilters(studyId);
+                }
+            }
         }
 
         function resetFilters(studyId) {
-            document.querySelectorAll(`select[data-study="${studyId}"]`).forEach(s => s.value = '');
+            // Décocher toutes les checkboxes
+            document.querySelectorAll(`.multi-select-container[data-study="${studyId}"] input[type="checkbox"]`).forEach(cb => cb.checked = false);
+            // Retirer le style actif et les badges
+            document.querySelectorAll(`.multi-select-container[data-study="${studyId}"] .multi-select-btn`).forEach(btn => {
+                btn.classList.remove('active');
+                const badge = btn.querySelector('.multi-select-badge');
+                if (badge) badge.remove();
+            });
+            // Afficher toutes les lignes
             document.querySelectorAll(`#qualifies-table-${studyId} tr`).forEach(r => r.classList.remove('hidden-by-filter'));
             const study = allData.studies.find(s => s.studyId === studyId);
             document.getElementById(`result-count-${studyId}`).textContent = study ? study.qualifies.length : 0;
@@ -923,67 +1133,38 @@ if (isset($_GET['logout'])) {
         }
 
         let questionTitles = {};
-
+        let questionOrder = [];
+        let questionLabels = {};
+        let questionFields = {};
         async function showResponses(studyId, index, type) {
             const study = allData.studies.find(s => s.studyId === studyId); if (!study) return;
-            let list;
-            if (type === 'qualifies') list = study.qualifies;
-            else if (type === 'refuses') list = study.refuses;
-            else if (type === 'enCours') list = study.enCours;
-            else list = study.qualifies;
+            let list = type === 'qualifies' ? study.qualifies : type === 'refuses' ? study.refuses : type === 'enCours' ? study.enCours : study.qualifies;
             const p = list[index]; if (!p) return;
             currentEditData = { studyId, studyFolder: study.folder, participantId: p.id, type, participant: p, originalReponses: JSON.parse(JSON.stringify(p.reponses || {})) };
             isEditMode = false;
-            
-            // Charger les titres des questions (utiliser le cache si disponible)
-            if (studyQuestionTitles[study.folder] && Object.keys(studyQuestionTitles[study.folder]).length > 0) {
-                questionTitles = studyQuestionTitles[study.folder];
-            } else {
-                // Charger les titres
-                questionTitles = await loadStudyQuestions(study.folder);
-            }
-            
-            console.log('Titres pour modal:', questionTitles);
+            const qData = studyQuestionData[study.folder] || await loadStudyQuestions(study.folder);
+            questionTitles = qData.titles || {};
+            questionOrder = qData.order || [];
+            questionLabels = qData.optionLabels || {};
+            questionFields = qData.fields || {};
             renderModal(false);
         }
 
         function renderModal(edit) {
+            if (!canEdit) edit = false;
             const p = currentEditData.participant, r = p.reponses || {}, folder = currentEditData.studyFolder;
-            let html = `<div class="mb-4 pb-4 border-b border-gray-100">
-                <div class="flex items-center justify-between mb-3">
-                    <div><p class="font-semibold text-gray-800">${esc(p.prenom)} ${esc(p.nom)}</p><p class="text-sm text-gray-500">${esc(p.email)}</p></div>
-                    <button onclick="toggleEdit()" class="px-3 py-1.5 text-sm ${edit ? 'bg-gray-100' : 'bg-amber-50 text-amber-600'} rounded-lg">${edit ? 'Annuler' : 'Modifier'}</button>
-                </div>
-                ${edit ? `<div class="grid grid-cols-2 gap-2">
-                    <input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="nom" value="${esc(p.nom||'')}" placeholder="Nom">
-                    <input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="prenom" value="${esc(p.prenom||'')}" placeholder="Prénom">
-                    <input type="email" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="email" value="${esc(p.email||'')}" placeholder="Email">
-                    <input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="telephone" value="${esc(p.telephone||'')}" placeholder="Téléphone">
-                    <input type="text" class="edit-sig col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="adresse" value="${esc(p.adresse||'')}" placeholder="Adresse">
-                    <input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="codePostal" value="${esc(p.codePostal||'')}" placeholder="CP">
-                    <input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="ville" value="${esc(p.ville||'')}" placeholder="Ville">
-                    <input type="text" class="edit-sig col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="horaire" value="${esc(p.horaire||'')}" placeholder="Horaire">
-                </div>` : `<div class="grid grid-cols-2 gap-2 text-sm"><p><span class="text-gray-400">Adresse:</span> ${esc(p.adresse||'-')}</p><p><span class="text-gray-400">CP:</span> ${esc(p.codePostal||'-')}</p><p><span class="text-gray-400">Ville:</span> ${esc(p.ville||'-')}</p><p><span class="text-gray-400">Horaire:</span> ${esc(p.horaire||'-')}</p></div>`}
-            </div>
-            <div class="mb-3"><p class="text-sm font-medium text-gray-700">Réponses au questionnaire</p></div>
-            <div class="space-y-2">`;
-            
-            Object.entries(r).forEach(([qId, ans]) => {
-                const title = questionTitles[qId] || qId;
-                if (edit) {
-                    const currentValue = getAnswerValue(ans);
-                    html += `<div class="py-2 border-b border-gray-50">
-                        <p class="text-xs text-gray-400 mb-1">${esc(title)}</p>
-                        <input type="text" class="edit-response w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" 
-                               data-qid="${qId}" value="${esc(currentValue)}" placeholder="Réponse">
-                    </div>`;
-                } else {
-                    html += `<div class="flex justify-between py-2 border-b border-gray-50">
-                        <span class="text-sm text-gray-500 flex-1">${esc(title)}</span>
-                        <span class="text-sm text-right text-gray-800 ml-4">${formatAns(ans, folder)}</span>
-                    </div>`;
-                }
-            });
+            let html = `<div class="mb-4 pb-4 border-b border-gray-100"><div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3"><div><p class="font-semibold text-gray-800">${esc(p.prenom)} ${esc(p.nom)}</p><p class="text-sm text-gray-500">${esc(p.email)}</p></div>${canEdit ? `<button onclick="toggleEdit()" class="px-4 py-2 text-sm ${edit ? 'btn-secondary' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'} rounded-lg transition">${edit ? 'Annuler' : 'Modifier'}</button>` : ''}</div>${edit ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="nom" value="${esc(p.nom||'')}" placeholder="Nom"><input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="prenom" value="${esc(p.prenom||'')}" placeholder="Prénom"><input type="email" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="email" value="${esc(p.email||'')}" placeholder="Email"><input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="telephone" value="${esc(p.telephone||'')}" placeholder="Téléphone"><input type="text" class="edit-sig sm:col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="adresse" value="${esc(p.adresse||'')}" placeholder="Adresse"><input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="codePostal" value="${esc(p.codePostal||'')}" placeholder="CP"><input type="text" class="edit-sig px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="ville" value="${esc(p.ville||'')}" placeholder="Ville"><input type="text" class="edit-sig sm:col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm" data-field="horaire" value="${esc(p.horaire||'')}" placeholder="Horaire"></div>` : `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm"><p><span class="text-gray-400">Adresse:</span> ${esc(p.adresse||'-')}</p><p><span class="text-gray-400">CP:</span> ${esc(p.codePostal||'-')}</p><p><span class="text-gray-400">Ville:</span> ${esc(p.ville||'-')}</p><p><span class="text-gray-400">Horaire:</span> ${esc(p.horaire||'-')}</p></div>`}</div><div class="mb-3"><p class="text-sm font-medium text-gray-700">Réponses au questionnaire</p></div><div class="space-y-2">`;
+            // Trier les réponses selon l'ordre du questionnaire
+            const responseKeys = Object.keys(r);
+            const sortedKeys = questionOrder.length > 0 
+                ? questionOrder.filter(qId => responseKeys.includes(qId))
+                : responseKeys.sort((a, b) => {
+                    const numA = parseInt(a.replace(/\D/g, '')) || 0;
+                    const numB = parseInt(b.replace(/\D/g, '')) || 0;
+                    return numA - numB;
+                });
+            responseKeys.forEach(k => { if (!sortedKeys.includes(k)) sortedKeys.push(k); });
+            sortedKeys.forEach(qId => { const ans = r[qId]; if (!ans) return; const title = questionTitles[qId] || qId; if (edit) { const cv = getAnswerValue(ans); html += `<div class="py-2 border-b border-gray-50"><p class="text-xs text-gray-400 mb-1">${esc(title)}</p><input type="text" class="edit-response w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" data-qid="${qId}" value="${esc(cv)}" placeholder="Réponse"></div>`; } else { html += `<div class="flex flex-col sm:flex-row sm:justify-between py-2 border-b border-gray-50 gap-1"><span class="text-sm text-gray-500 flex-1">${esc(title)}</span><span class="text-sm sm:text-right text-gray-800 sm:ml-4">${formatAns(ans, folder, qId)}</span></div>`; } });
             html += '</div>';
             document.getElementById('modal-body').innerHTML = html;
             document.getElementById('modal-title').textContent = edit ? 'Modifier' : 'Détail';
@@ -994,494 +1175,466 @@ if (isset($_GET['logout'])) {
 
         function getAnswerValue(ans) {
             if (!ans) return '';
-            if (ans.file) return '[Photo]';
+            if (ans.file || ans.filename) return '[Photo]';
             if (ans.value !== undefined) return String(ans.value).replace(/_/g, ' ');
-            if (ans.values) {
-                if (Array.isArray(ans.values)) return ans.values.join(', ').replace(/_/g, ' ');
-                return Object.entries(ans.values).map(([k,v]) => k + ': ' + v).join(' | ');
-            }
+            if (ans.values) { if (Array.isArray(ans.values)) return ans.values.join(', ').replace(/_/g, ' '); return Object.entries(ans.values).map(([k,v]) => k + ': ' + v).join(' | '); }
+            if (ans.matrix) return Object.entries(ans.matrix).map(([k,v]) => k + ': ' + v).join(' | ');
             return JSON.stringify(ans);
         }
 
-        function toggleEdit() { 
-            isEditMode = !isEditMode; 
-            if (!isEditMode) {
-                currentEditData.participant.reponses = JSON.parse(JSON.stringify(currentEditData.originalReponses)); 
+        function formatAns(ans, folder, qId) {
+            if (!ans) return '-';
+            
+            // Photos
+            if (ans.file && ans.file.filename) return `<a href="../api/photo.php?study=${folder}&file=${encodeURIComponent(ans.file.filename)}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition text-xs font-medium">📷 Voir photo</a>`;
+            if (ans.filename) return `<a href="../api/photo.php?study=${folder}&file=${encodeURIComponent(ans.filename)}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition text-xs font-medium">📷 Voir photo</a>`;
+            
+            const labels = questionLabels[qId] || {};
+            const fields = questionFields[qId] || {};
+            
+            // Valeur simple (single, number)
+            if (ans.value !== undefined) {
+                const val = String(ans.value);
+                const label = labels[val] || val.replace(/_/g, ' ');
+                return esc(label);
             }
-            renderModal(isEditMode); 
+            
+            // Texte brut (pour les questions de type text)
+            if (ans.text !== undefined) {
+                return esc(String(ans.text));
+            }
+            
+            // Valeurs multiples (multiple) ou double_text
+            if (ans.values) {
+                // Array = choix multiples
+                if (Array.isArray(ans.values)) {
+                    const formatted = ans.values.map(v => labels[v] || v.replace(/_/g, ' '));
+                    return esc(formatted.join(', '));
+                }
+                // Object = double_text ou autre
+                if (typeof ans.values === 'object') {
+                    const parts = [];
+                    Object.entries(ans.values).forEach(([k, v]) => {
+                        const fieldLabel = fields[k] || k.replace(/_/g, ' ');
+                        const value = String(v).replace(/_/g, ' ');
+                        // Format: "Label : valeur"
+                        parts.push(`<span class="text-gray-400">${esc(fieldLabel)} :</span> ${esc(value)}`);
+                    });
+                    return parts.join('<br>');
+                }
+            }
+            
+            // Matrix
+            if (ans.matrix) {
+                const parts = Object.entries(ans.matrix).map(([k,v]) => `${k.replace(/_/g, ' ')}: ${v}`);
+                return esc(parts.join(', '));
+            }
+            
+            // Extra texts
+            if (ans.extraTexts && Object.keys(ans.extraTexts).length > 0) {
+                const parts = Object.entries(ans.extraTexts).map(([k,v]) => v).filter(v => v);
+                return esc(parts.join(', '));
+            }
+            
+            // Fallback: si c'est une string directe
+            if (typeof ans === 'string') {
+                return esc(ans);
+            }
+            
+            return esc(JSON.stringify(ans));
         }
 
-        function formatAns(a, folder) {
-            if (!a) return '-';
-            if (a.file) { let fn = a.file.filename || a.file.name || (typeof a.file === 'string' ? a.file : null); if (fn) { let url = '../api/photo.php?file=' + encodeURIComponent(fn); if (folder) url += '&study=' + encodeURIComponent(folder); return '<a href="' + url + '" target="_blank" class="text-sidebar-active hover:underline">Voir photo</a>'; } }
-            if (a.value !== undefined) return esc(String(a.value).replace(/_/g, ' '));
-            if (a.values) { 
-                if (Array.isArray(a.values)) return esc(a.values.join(', ').replace(/_/g, ' ')); 
-                // Format objet : "Marque : Babyliss, Modèle : Ndp"
-                return Object.entries(a.values).map(([k,v]) => {
-                    // Capitaliser la clé et remplacer les underscores
-                    const key = k.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
-                    // Remplacer les underscores dans la valeur aussi
-                    const val = String(v).replace(/_/g, ' ');
-                    return key + ' : ' + val;
-                }).join(', '); 
-            }
-            return esc(JSON.stringify(a));
-        }
-
-        function closeModal() { document.getElementById('responses-modal').classList.add('hidden'); document.getElementById('responses-modal').classList.remove('flex'); }
+        function toggleEdit() { isEditMode = !isEditMode; renderModal(isEditMode); }
 
         async function saveChanges() {
             if (!currentEditData) return;
-            const sig = {}; 
-            document.querySelectorAll('.edit-sig').forEach(i => { 
-                if (i.dataset.field) sig[i.dataset.field] = i.value.trim(); 
-            });
-            
-            // Récupérer les réponses modifiées
-            const newReponses = JSON.parse(JSON.stringify(currentEditData.participant.reponses || {}));
-            document.querySelectorAll('.edit-response').forEach(input => {
-                const qId = input.dataset.qid;
-                const newValue = input.value.trim();
-                if (qId && newReponses[qId]) {
-                    // Mettre à jour la valeur selon le type de réponse
-                    if (newReponses[qId].value !== undefined) {
-                        newReponses[qId].value = newValue.replace(/ /g, '_');
-                    } else if (newReponses[qId].values && Array.isArray(newReponses[qId].values)) {
-                        newReponses[qId].values = newValue.split(',').map(v => v.trim().replace(/ /g, '_'));
-                    }
-                }
-            });
-            
+            const updatedSig = {}, updatedReponses = JSON.parse(JSON.stringify(currentEditData.originalReponses));
+            document.querySelectorAll('.edit-sig').forEach(inp => updatedSig[inp.dataset.field] = inp.value);
+            document.querySelectorAll('.edit-response').forEach(inp => { const qId = inp.dataset.qid, nv = inp.value.trim(); if (updatedReponses[qId]) { if (updatedReponses[qId].value !== undefined) updatedReponses[qId].value = nv; else if (updatedReponses[qId].values && Array.isArray(updatedReponses[qId].values)) updatedReponses[qId].values = nv.split(',').map(v => v.trim()); } });
             try {
-                const res = await fetch('../api/admin-data.php', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ 
-                        action: 'update_participant', 
-                        studyFolder: currentEditData.studyFolder, 
-                        participantId: currentEditData.participantId, 
-                        signaletique: sig, 
-                        horaire: sig.horaire || '', 
-                        reponses: newReponses 
-                    }) 
-                });
-                const data = await res.json(); 
-                if (data.success) { 
-                    closeModal(); 
-                    loadData(); 
-                } else {
-                    alert(data.error || 'Erreur lors de la sauvegarde');
-                }
-            } catch (e) { 
-                console.error(e); 
-                alert('Erreur de connexion');
-            }
+                const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_participant', studyId: currentEditData.studyId, participantId: currentEditData.participantId, type: currentEditData.type, signaletics: updatedSig, reponses: updatedReponses }) });
+                const data = await res.json();
+                if (data.success) { closeModal(); loadData(); } else alert('Erreur: ' + (data.error || 'Échec'));
+            } catch (e) { alert('Erreur de connexion'); }
         }
 
-        async function deleteParticipant(studyId, participantId, name) {
-            if (!confirm('Supprimer ' + name + ' ?')) return;
-            try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_participant', studyId, participantId }) }); const data = await res.json(); if (data.success) loadData(); } catch (e) { console.error(e); }
-        }
+        function closeModal() { document.getElementById('responses-modal').classList.add('hidden'); document.getElementById('responses-modal').classList.remove('flex'); currentEditData = null; isEditMode = false; }
+        function openModal() { document.getElementById('responses-modal').classList.remove('hidden'); document.getElementById('responses-modal').classList.add('flex'); }
+        function esc(str) { if (str === null || str === undefined) return ''; return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
-        async function acceptParticipant(studyId, participantId, name) {
-            if (!confirm('Accepter ' + name + ' et le passer en qualifié ?')) return;
-            try { 
-                const res = await fetch('../api/admin-data.php', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ action: 'accept_participant', studyId, participantId }) 
-                }); 
-                const data = await res.json(); 
-                if (data.success) {
-                    loadData();
-                    alert(name + ' a été accepté et déplacé vers les qualifiés.');
-                } else {
-                    alert('Erreur : ' + (data.error || 'Impossible d\'accepter ce participant'));
-                }
-            } catch (e) { 
-                console.error(e); 
-                alert('Erreur de connexion');
-            }
-        }
-
-        async function closeStudy(folder) {
-            if (!confirm('Terminer cette étude ?')) return;
-            try { const res = await fetch('../api/study-status.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'close', studyFolder: folder }) }); const data = await res.json(); if (data.success) loadData(); } catch (e) { console.error(e); }
-        }
-
-        async function reopenStudy(folder) {
-            if (!confirm('Réouvrir cette étude ?')) return;
-            try { 
-                const res = await fetch('../api/study-status.php', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ action: 'reopen', studyFolder: folder }) 
-                }); 
-                const data = await res.json(); 
-                if (data.success) {
-                    switchTab('studies');
-                    loadData(); 
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        function exportStudy(studyId, type) {
+        async function exportStudy(studyId, type) {
             const study = allData.studies.find(s => s.studyId === studyId); if (!study) return;
-            const data = type === 'qualifies' ? study.qualifies : study.refuses;
-            if (!data || data.length === 0) { alert('Aucune donnée'); return; }
+            const data = type === 'qualifies' ? study.qualifies : study.refuses; if (!data || data.length === 0) { alert('Aucune donnée à exporter'); return; }
             
-            // Fonction pour formater les dates
-            function formatExportDate(dateStr) {
-                if (!dateStr || dateStr === 'N/A') return '';
-                try {
-                    const d = new Date(dateStr);
-                    if (isNaN(d.getTime())) return dateStr;
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, '0');
-                    const minutes = String(d.getMinutes()).padStart(2, '0');
-                    return `${day}/${month}/${year} ${hours}:${minutes}`;
-                } catch (e) {
-                    return dateStr;
-                }
-            }
+            function formatExportDate(ds) { if (!ds) return ''; try { const d = new Date(ds); if (isNaN(d.getTime())) return ds; return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch (e) { return ds; } }
             
-            fetch('../studies/' + study.folder + '/questions.js?v=' + Date.now()).then(r => r.text()).then(js => {
-                // Parser les titres des questions avec une meilleure regex
-                const titles = {};
-                const regex = /id:\s*['"]([^'"]+)['"][^}]*?(?:title|question):\s*['"]([^'"]+)['"]/gs;
-                let match;
-                while ((match = regex.exec(js)) !== null) {
-                    const id = match[1];
-                    const title = match[2].replace(/<[^>]*>/g, '').replace(/_/g, ' ').trim();
-                    if (title && !titles[id]) {
-                        titles[id] = title.substring(0, 60);
-                    }
-                }
-                console.log('Titres pour export:', titles);
-                
-                const allQIds = new Set(); 
-                data.forEach(p => { if (p.reponses) Object.keys(p.reponses).forEach(q => allQIds.add(q)); });
-                const qIds = Array.from(allQIds).sort((a, b) => { 
-                    const na = parseInt(a.replace(/\D/g, '')) || 0;
-                    const nb = parseInt(b.replace(/\D/g, '')) || 0; 
+            // Charger les données des questions
+            const qData = await loadStudyQuestions(study.folder);
+            const titles = qData.titles || {};
+            const optLabels = qData.optionLabels || {};
+            const fields = qData.fields || {};
+            
+            // Collecter tous les IDs de questions
+            const allQIds = new Set(); 
+            data.forEach(p => { if (p.reponses) Object.keys(p.reponses).forEach(q => allQIds.add(q)); });
+            
+            // Trier selon l'ordre du questionnaire ou par numéro
+            const qIds = qData.order && qData.order.length > 0 
+                ? qData.order.filter(qId => allQIds.has(qId))
+                : Array.from(allQIds).sort((a, b) => { 
+                    const na = parseInt(a.replace(/\D/g, '')) || 0, nb = parseInt(b.replace(/\D/g, '')) || 0; 
                     return na !== nb ? na - nb : a.localeCompare(b); 
                 });
+            
+            // Ajouter les questions non triées
+            allQIds.forEach(qId => { if (!qIds.includes(qId)) qIds.push(qId); });
+            
+            // Construire les en-têtes
+            let headers = ['ID', 'Nom', 'Prénom', 'Email', 'Téléphone', 'Adresse', 'CP', 'Ville', 'Horaire', 'Date']; 
+            if (type === 'refuses') headers.push('Raisons'); 
+            qIds.forEach(qId => headers.push(titles[qId] || qId));
+            
+            // Fonction pour formater une réponse pour l'export
+            function formatExportAnswer(a, qId) {
+                if (!a) return '';
+                if (a.file) return a.file.filename || 'Photo';
                 
-                let headers = ['ID', 'Nom', 'Prénom', 'Email', 'Téléphone', 'Adresse', 'CP', 'Ville', 'Horaire', 'Date']; 
-                if (type === 'refuses') headers.push('Raisons'); 
-                qIds.forEach(qId => headers.push(titles[qId] || qId));
+                const labels = optLabels[qId] || {};
+                const flds = fields[qId] || {};
                 
-                const rows = data.map(p => { 
-                    let row = [p.accessId||'', p.nom||'', p.prenom||'', p.email||'', p.telephone||'', p.adresse||'', p.codePostal||'', p.ville||'', p.horaire||'', formatExportDate(p.date)]; 
-                    if (type === 'refuses') row.push((p.raisons||[]).join(' | ')); 
-                    qIds.forEach(qId => { 
-                        const a = p.reponses?.[qId]; 
-                        if (!a) { row.push(''); return; } 
-                        if (a.file) { row.push(a.file.filename || 'Photo'); return; } 
-                        if (a.value !== undefined) { row.push(String(a.value).replace(/_/g, ' ')); return; } 
-                        if (a.values) { 
-                            if (Array.isArray(a.values)) { row.push(a.values.join(', ').replace(/_/g, ' ')); return; } 
-                            row.push(Object.entries(a.values).map(([k,v]) => {
-                                const key = k.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
-                                const val = String(v).replace(/_/g, ' ');
-                                return key + ' : ' + val;
-                            }).join(', ')); 
-                            return; 
-                        } 
-                        row.push(JSON.stringify(a)); 
-                    }); 
-                    return row; 
-                });
+                // Valeur simple (single, number, text)
+                if (a.value !== undefined) {
+                    const val = String(a.value);
+                    return labels[val] || val.replace(/_/g, ' ');
+                }
                 
-                const form = document.createElement('form'); 
-                form.method = 'POST'; 
-                form.action = '../api/export-xlsx.php'; 
-                form.innerHTML = '<input type="hidden" name="data" value=\'' + JSON.stringify({headers, rows}).replace(/'/g, '&#39;') + '\'><input type="hidden" name="filename" value="' + studyId + '_' + type + '"><input type="hidden" name="studyId" value="' + studyId + '">'; 
-                document.body.appendChild(form); 
-                form.submit(); 
-                document.body.removeChild(form);
+                // Texte brut (pour les questions de type text)
+                if (a.text !== undefined) {
+                    return String(a.text);
+                }
+                
+                // Valeurs multiples ou double_text
+                if (a.values) {
+                    if (Array.isArray(a.values)) {
+                        // Choix multiples - utiliser les labels
+                        return a.values.map(v => labels[v] || v.replace(/_/g, ' ')).join(', ');
+                    }
+                    if (typeof a.values === 'object') {
+                        // Double text - formater avec labels des champs
+                        return Object.entries(a.values)
+                            .map(([k, v]) => {
+                                const fieldLabel = flds[k] || k.replace(/_/g, ' ');
+                                return fieldLabel + ' : ' + String(v).replace(/_/g, ' ');
+                            })
+                            .join(' | ');
+                    }
+                }
+                
+                // Fallback: si c'est une string directe
+                if (typeof a === 'string') {
+                    return a;
+                }
+                
+                return JSON.stringify(a);
+            }
+            
+            // Construire les lignes
+            const rows = data.map(p => { 
+                let row = [p.accessId||'', p.nom||'', p.prenom||'', p.email||'', p.telephone||'', p.adresse||'', p.codePostal||'', p.ville||'', p.horaire||'', formatExportDate(p.date)]; 
+                if (type === 'refuses') row.push((p.raisons||[]).join(' | ')); 
+                qIds.forEach(qId => { 
+                    row.push(formatExportAnswer(p.reponses?.[qId], qId)); 
+                }); 
+                return row; 
             });
+            
+            // Envoyer au serveur
+            const form = document.createElement('form'); 
+            form.method = 'POST'; 
+            form.action = '../api/export-xlsx.php'; 
+            form.innerHTML = '<input type="hidden" name="data" value=\'' + JSON.stringify({headers, rows}).replace(/'/g, '&#39;') + '\'><input type="hidden" name="filename" value="' + studyId + '_' + type + '"><input type="hidden" name="studyId" value="' + studyId + '">'; 
+            document.body.appendChild(form); 
+            form.submit(); 
+            document.body.removeChild(form);
+        }
+
+        function exportJSONL(studyId) {
+            // Utiliser l'export universel qui fonctionne avec toutes les études
+            window.open('../api/export-jsonl-universal.php?study=' + encodeURIComponent(studyId), '_blank');
         }
 
         function copyStudyLink(folder) {
-            const baseUrl = window.location.origin + window.location.pathname.replace('/admin/dashboard.php', '');
-            const link = baseUrl + '/studies/' + folder + '/';
-            navigator.clipboard.writeText(link).then(() => {
-                // Afficher une notification temporaire
-                const btn = event.target.closest('button');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copié !';
-                btn.classList.add('text-green-600');
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.classList.remove('text-green-600');
-                }, 2000);
-            }).catch(() => {
-                // Fallback pour les navigateurs plus anciens
-                const input = document.createElement('input');
-                input.value = link;
-                document.body.appendChild(input);
-                input.select();
-                document.execCommand('copy');
-                document.body.removeChild(input);
-                alert('Lien copié : ' + link);
-            });
+            const link = window.location.origin + window.location.pathname.replace('/admin/dashboard.php', '') + '/studies/' + folder + '/';
+            navigator.clipboard.writeText(link).then(() => { const btn = event.target.closest('button'), ot = btn.innerHTML; btn.innerHTML = '✓ Copié !'; btn.classList.add('text-green-600'); setTimeout(() => { btn.innerHTML = ot; btn.classList.remove('text-green-600'); }, 2000); }).catch(() => { const input = document.createElement('input'); input.value = link; document.body.appendChild(input); input.select(); document.execCommand('copy'); document.body.removeChild(input); alert('Lien copié : ' + link); });
         }
 
-        function toggleAccessIdsPanel(folder) {
-            const panel = document.getElementById('access-ids-panel-' + folder);
-            if (panel.classList.contains('hidden')) {
-                panel.classList.remove('hidden');
-                loadAccessIds(folder);
-            } else {
-                panel.classList.add('hidden');
-            }
-        }
+        function toggleAccessIdsPanel(folder) { const p = document.getElementById('access-ids-panel-' + folder); if (p.classList.contains('hidden')) { p.classList.remove('hidden'); loadAccessIds(folder); } else p.classList.add('hidden'); }
 
         async function loadAccessIds(folder) {
             const listEl = document.getElementById('access-ids-list-' + folder);
             try {
-                const res = await fetch('../api/admin-data.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'get_access_ids', studyFolder: folder })
-                });
+                const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get_access_ids', studyFolder: folder }) });
                 const data = await res.json();
-                if (data.success) {
-                    const ids = data.ids || [];
-                    const used = data.usedIds || [];
-                    if (ids.length === 0) {
-                        listEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-2">Aucun ID configuré</p>';
-                    } else {
-                        listEl.innerHTML = '<div class="flex flex-wrap gap-2">' + ids.map(id => {
-                            const isUsed = used.includes(id);
-                            return `<div class="flex items-center gap-1 px-2 py-1 ${isUsed ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'} rounded text-sm">
-                                <span class="font-mono">${esc(id)}</span>
-                                ${isUsed ? '<span class="text-xs">(utilisé)</span>' : `<button onclick="removeAccessId('${folder}', '${id}')" class="ml-1 text-red-500 hover:text-red-700">&times;</button>`}
-                            </div>`;
-                        }).join('') + '</div>';
-                    }
-                }
-            } catch (e) {
-                listEl.innerHTML = '<p class="text-red-500 text-sm text-center py-2">Erreur de chargement</p>';
-            }
+                if (data.success) { const ids = data.ids || [], used = data.usedIds || []; if (ids.length === 0) listEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-2">Aucun ID configuré</p>'; else listEl.innerHTML = '<div class="flex flex-wrap gap-2">' + ids.map(id => { const isUsed = used.includes(id); return `<div class="flex items-center gap-1 px-2 py-1 ${isUsed ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'} rounded text-sm"><span class="font-mono">${esc(id)}</span>${isUsed ? '<span class="text-xs">(utilisé)</span>' : `<button onclick="removeAccessId('${folder}', '${id}')" class="ml-1 text-red-500 hover:text-red-700">×</button>`}</div>`; }).join('') + '</div>'; }
+            } catch (e) { listEl.innerHTML = '<p class="text-red-500 text-sm text-center py-2">Erreur de chargement</p>'; }
         }
 
-        async function addAccessIds(folder) {
-            const input = document.getElementById('new-access-ids-' + folder);
-            const rawValue = input.value.trim();
-            if (!rawValue) return;
-            
-            const ids = rawValue.split(/[\s,;]+/).map(id => id.trim()).filter(id => id.length > 0);
-            if (ids.length === 0) return;
-            
-            try {
-                const res = await fetch('../api/admin-data.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'add_access_ids', studyFolder: folder, ids: ids })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    input.value = '';
-                    loadAccessIds(folder);
-                } else {
-                    alert(data.error || 'Erreur');
-                }
-            } catch (e) {
-                alert('Erreur de connexion');
-            }
+        async function addAccessIds(folder) { const input = document.getElementById('new-access-ids-' + folder), newIds = input.value.split(/[,\n]+/).map(id => id.trim()).filter(id => id); if (newIds.length === 0) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_access_ids', studyFolder: folder, ids: newIds }) }); const data = await res.json(); if (data.success) { input.value = ''; loadAccessIds(folder); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function removeAccessId(folder, id) { if (!confirm('Supprimer l\'ID "' + id + '" ?')) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_access_id', studyFolder: folder, accessCode: id }) }); const data = await res.json(); if (data.success) { loadAccessIds(folder); showToast('✓ ID supprimé'); } else { alert('Erreur: ' + (data.error || 'Échec')); } } catch (e) { alert('Erreur de connexion'); } }
+        async function closeStudy(folder) { if (!confirm('Terminer cette étude ? Elle sera archivée.')) return; try { const res = await fetch('../api/study-status.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: folder, status: 'closed' }) }); const data = await res.json(); if (data.success) { loadData(); switchTab('closed'); } else { alert('Erreur: ' + (data.error || 'Échec')); } } catch (e) { alert('Erreur de connexion'); } }
+        async function reopenStudy(folder) { if (!confirm('Réouvrir cette étude ?')) return; try { const res = await fetch('../api/study-status.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: folder, status: 'active' }) }); const data = await res.json(); if (data.success) { loadData(); switchTab('studies'); } else { alert('Erreur: ' + (data.error || 'Échec')); } } catch (e) { alert('Erreur de connexion'); } }
+        async function deleteStudy(folder, studyName) { 
+            if (!confirm('⚠️ ATTENTION ⚠️\n\nVous allez supprimer définitivement l\'étude :\n"' + studyName + '"\n\nCette action supprimera :\n- Toutes les réponses des participants\n- Tous les fichiers uploadés\n- Toutes les données associées\n\nCette action est IRRÉVERSIBLE !\n\nContinuer ?')) return; 
+            const confirmText = prompt('Pour confirmer, tapez le nom de l\'étude :\n' + studyName);
+            if (confirmText !== studyName) { alert('Le nom ne correspond pas. Suppression annulée.'); return; }
+            try { 
+                const res = await fetch('../api/study-status.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: folder, action: 'delete' }) }); 
+                const data = await res.json(); 
+                if (data.success) { alert('✓ Étude supprimée définitivement'); loadData(); switchTab('closed'); } 
+                else { alert('Erreur: ' + (data.error || 'Échec de la suppression')); } 
+            } catch (e) { alert('Erreur de connexion'); } 
         }
+        async function deleteParticipant(studyId, participantId, type) { if (!confirm('Supprimer ce participant ?')) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_participant', studyId, participantId, type }) }); const data = await res.json(); if (data.success) loadData(); } catch (e) { alert('Erreur'); } }
+        async function moveToQualified(studyId, participantId) { if (!confirm('Déplacer ce participant vers les qualifiés ?')) return; try { const res = await fetch('../api/admin-data.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move_to_qualified', studyId, participantId }) }); const data = await res.json(); if (data.success) loadData(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur'); } }
 
-        async function removeAccessId(folder, id) {
-            if (!confirm('Supprimer l\'ID "' + id + '" ?')) return;
-            try {
-                const res = await fetch('../api/admin-data.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'remove_access_id', studyFolder: folder, accessId: id })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    loadAccessIds(folder);
-                }
-            } catch (e) {
-                alert('Erreur de connexion');
-            }
-        }
-
-        // ===== PRÉVISUALISATION DU QUESTIONNAIRE =====
-        let previewQuestions = [];
-        let previewCurrentIndex = 0;
-        let previewStudyFolder = null;
-
+        let previewQuestions = [], previewIndex = 0;
         async function previewStudy(folder) {
-            previewStudyFolder = folder;
-            previewCurrentIndex = 0;
-            
             try {
-                const response = await fetch('../studies/' + folder + '/questions.js?v=' + Date.now());
-                const jsContent = await response.text();
-                
-                // Extraire STUDY_CONFIG
-                const configMatch = jsContent.match(/const\s+STUDY_CONFIG\s*=\s*(\{[\s\S]*\});?\s*$/m);
-                if (!configMatch) {
-                    alert('Impossible de charger la configuration de l\'étude');
-                    return;
+                const res = await fetch('../studies/' + folder + '/questions.js?v=' + Date.now()), js = await res.text();
+                // Chercher questions: [...] dans STUDY_CONFIG ou const questions = [...]
+                let match = js.match(/questions:\s*\[([\s\S]*?)\]\s*\};?\s*$/);
+                if (!match) match = js.match(/const\s+questions\s*=\s*(\[[\s\S]*?\]);/);
+                if (!match) { alert('Format de questions non reconnu'); return; }
+                // Reconstruire le tableau
+                const questionsStr = match[0].includes('questions:') ? '[' + match[1] + ']' : match[1];
+                try { previewQuestions = eval(questionsStr); } catch(e) { 
+                    // Fallback: exécuter tout le fichier et récupérer STUDY_CONFIG
+                    eval(js);
+                    if (typeof STUDY_CONFIG !== 'undefined' && STUDY_CONFIG.questions) {
+                        previewQuestions = STUDY_CONFIG.questions;
+                    } else { alert('Format de questions non reconnu'); return; }
                 }
-                
-                // Parser le contenu JS de manière sécurisée
-                try {
-                    const evalFunc = new Function('return ' + configMatch[1]);
-                    const config = evalFunc();
-                    previewQuestions = config.questions || [];
-                    
-                    document.getElementById('preview-title').textContent = config.studyTitle || 'Questionnaire';
-                    document.getElementById('preview-subtitle').textContent = previewQuestions.length + ' questions';
-                    
-                    // Remplir le sélecteur de questions
-                    const select = document.getElementById('preview-jump');
-                    select.innerHTML = previewQuestions.map((q, i) => 
-                        `<option value="${i}">${q.id} - ${(q.title || q.question || '').substring(0, 30)}...</option>`
-                    ).join('');
-                    
-                    renderPreviewQuestion();
-                    openPreview();
-                } catch (e) {
-                    console.error('Erreur parsing config:', e);
-                    alert('Erreur lors du parsing de la configuration');
-                }
-            } catch (e) {
-                console.error('Erreur chargement questions:', e);
-                alert('Erreur lors du chargement du questionnaire');
-            }
-        }
-
-        function openPreview() {
-            document.getElementById('preview-modal').classList.remove('hidden');
-            document.getElementById('preview-modal').classList.add('flex');
-        }
-
-        function closePreview() {
-            document.getElementById('preview-modal').classList.add('hidden');
-            document.getElementById('preview-modal').classList.remove('flex');
+                previewIndex = 0;
+                document.getElementById('preview-title').textContent = 'Prévisualisation';
+                document.getElementById('preview-subtitle').textContent = folder;
+                document.getElementById('preview-jump').innerHTML = previewQuestions.map((q, i) => `<option value="${i}">${i + 1}. ${q.id}</option>`).join('');
+                renderPreviewQuestion();
+                document.getElementById('preview-modal').classList.remove('hidden');
+                document.getElementById('preview-modal').classList.add('flex');
+            } catch (e) { alert('Erreur de chargement'); }
         }
 
         function renderPreviewQuestion() {
-            if (previewQuestions.length === 0) return;
-            
-            const q = previewQuestions[previewCurrentIndex];
-            const total = previewQuestions.length;
-            
-            // Mettre à jour le compteur
-            document.getElementById('preview-counter').textContent = `${previewCurrentIndex + 1} / ${total}`;
-            document.getElementById('preview-jump').value = previewCurrentIndex;
-            
-            // Boutons prev/next
-            document.getElementById('preview-prev').disabled = previewCurrentIndex === 0;
-            document.getElementById('preview-prev').classList.toggle('opacity-50', previewCurrentIndex === 0);
-            document.getElementById('preview-next').disabled = previewCurrentIndex === total - 1;
-            document.getElementById('preview-next').classList.toggle('opacity-50', previewCurrentIndex === total - 1);
-            
-            // Dots de navigation
-            const dotsHtml = previewQuestions.map((_, i) => 
-                `<button onclick="goToQuestion(${i})" class="w-2 h-2 rounded-full transition ${i === previewCurrentIndex ? 'bg-purple-600 w-4' : 'bg-gray-300 hover:bg-gray-400'}"></button>`
-            ).join('');
-            document.getElementById('preview-dots').innerHTML = dotsHtml;
-            
-            // Contenu de la question
-            let html = `
-                <div class="mb-4">
-                    <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">${esc(q.id)}</span>
-                    <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded ml-2">${esc(q.type || 'single')}</span>
-                    ${q.showIf ? `<span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded ml-2">Conditionnel</span>` : ''}
-                </div>
-                <h4 class="text-lg font-semibold text-gray-800 mb-2">${esc(q.title || '')}</h4>
-                <p class="text-gray-600 mb-6">${q.question || ''}</p>
-            `;
-            
-            // Afficher les options selon le type
-            if (q.type === 'single' || q.type === 'multiple' || !q.type) {
-                if (q.options && q.options.length > 0) {
-                    html += `<div class="space-y-2">`;
-                    q.options.forEach(opt => {
-                        const isStop = opt.stop === true;
-                        html += `
-                            <div class="flex items-center gap-3 p-3 border ${isStop ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'} rounded-lg">
-                                <div class="w-5 h-5 border-2 ${q.type === 'multiple' ? 'rounded' : 'rounded-full'} ${isStop ? 'border-red-400' : 'border-gray-300'}"></div>
-                                <span class="flex-1 ${isStop ? 'text-red-700' : 'text-gray-700'}">${esc(opt.label || opt.value)}</span>
-                                ${isStop ? '<span class="text-xs text-red-500 font-medium">STOP</span>' : ''}
-                                ${opt.exclusive ? '<span class="text-xs text-blue-500 font-medium">EXCLUSIF</span>' : ''}
-                            </div>
-                        `;
-                    });
-                    html += `</div>`;
-                }
-            } else if (q.type === 'text') {
-                html += `<div class="p-3 border border-gray-200 bg-gray-50 rounded-lg text-gray-400 italic">${q.placeholder || 'Champ texte...'}</div>`;
-            } else if (q.type === 'number') {
-                html += `<div class="p-3 border border-gray-200 bg-gray-50 rounded-lg text-gray-400 italic">Champ numérique ${q.min !== undefined ? '(min: ' + q.min + ')' : ''} ${q.max !== undefined ? '(max: ' + q.max + ')' : ''}</div>`;
-            } else if (q.type === 'photo') {
-                html += `<div class="p-6 border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg text-center text-gray-400">
-                    <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    Upload photo
-                </div>`;
-            } else if (q.type === 'scale') {
-                html += `<div class="flex items-center justify-between gap-2 mt-4">`;
-                const min = q.min || 1, max = q.max || 10;
-                for (let i = min; i <= max; i++) {
-                    html += `<button class="w-10 h-10 border border-gray-300 rounded-lg text-gray-600 hover:bg-purple-100">${i}</button>`;
-                }
-                html += `</div>`;
-                if (q.minLabel || q.maxLabel) {
-                    html += `<div class="flex justify-between text-xs text-gray-400 mt-2"><span>${q.minLabel || ''}</span><span>${q.maxLabel || ''}</span></div>`;
-                }
-            }
-            
-            // Condition d'affichage
-            if (q.showIf) {
-                html += `<div class="mt-6 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p class="text-xs font-medium text-amber-700 mb-1">Condition d'affichage :</p>
-                    <code class="text-xs text-amber-800 break-all">${esc(q.showIf.toString().substring(0, 200))}</code>
-                </div>`;
-            }
-            
+            const q = previewQuestions[previewIndex]; if (!q) return;
+            document.getElementById('preview-counter').textContent = `${previewIndex + 1} / ${previewQuestions.length}`;
+            document.getElementById('preview-jump').value = previewIndex;
+            let html = `<div class="mb-4"><span class="inline-block px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded mb-2">${q.type}</span><p class="text-xs text-gray-400 mb-1">ID: ${q.id}</p><h3 class="text-lg font-medium text-gray-800">${q.title || q.question || ''}</h3></div>`;
+            if (q.options) { html += '<div class="space-y-2">'; q.options.forEach(opt => { const label = typeof opt === 'string' ? opt : opt.label; html += `<div class="p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm">${label}</div>`; }); html += '</div>'; }
+            if (q.image) html += `<div class="mt-4"><img src="../studies/${document.getElementById('preview-subtitle').textContent}/${q.image}" class="max-w-full rounded-lg shadow"></div>`;
             document.getElementById('preview-body').innerHTML = html;
+            document.getElementById('preview-prev').disabled = previewIndex === 0;
+            document.getElementById('preview-prev').classList.toggle('opacity-50', previewIndex === 0);
+            document.getElementById('preview-next').disabled = previewIndex === previewQuestions.length - 1;
+            document.getElementById('preview-next').classList.toggle('opacity-50', previewIndex === previewQuestions.length - 1);
+            document.getElementById('preview-dots').innerHTML = previewQuestions.length <= 15 ? previewQuestions.map((_, i) => `<button onclick="goToPreviewQuestion(${i})" class="w-2 h-2 rounded-full ${i === previewIndex ? 'bg-purple-600' : 'bg-gray-300'} transition"></button>`).join('') : '';
         }
 
-        function nextQuestion() {
-            if (previewCurrentIndex < previewQuestions.length - 1) {
-                previewCurrentIndex++;
-                renderPreviewQuestion();
+        function prevQuestion() { if (previewIndex > 0) { previewIndex--; renderPreviewQuestion(); } }
+        function nextQuestion() { if (previewIndex < previewQuestions.length - 1) { previewIndex++; renderPreviewQuestion(); } }
+        function jumpToQuestion() { previewIndex = parseInt(document.getElementById('preview-jump').value); renderPreviewQuestion(); }
+        function goToPreviewQuestion(index) { previewIndex = index; renderPreviewQuestion(); }
+        function closePreview() { document.getElementById('preview-modal').classList.add('hidden'); document.getElementById('preview-modal').classList.remove('flex'); }
+
+        let usersData = [], studiesList = [];
+        let logsData = '';
+        async function loadAccounts() { 
+            try { 
+                const res = await fetch('../api/users-management.php?action=list'), data = await res.json(); 
+                if (data.success) { usersData = data.users || []; studiesList = data.studies || []; }
+                renderAccountsContent();
+                loadLogs();
+            } catch (e) { document.getElementById('main-content').innerHTML = '<div class="text-center text-red-500 py-8">Erreur de chargement</div>'; } 
+        }
+        
+        async function loadLogs() {
+            try {
+                const res = await fetch('../api/admin-data.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'get_logs' })
+                });
+                const data = await res.json();
+                if (data.success && data.logs) {
+                    const logsHtml = data.logs.split('\n').filter(l => l.trim()).reverse().slice(0, 50).map(line => 
+                        `<div class="py-1 border-b border-gray-800">${esc(line)}</div>`
+                    ).join('');
+                    document.getElementById('logs-container').innerHTML = logsHtml || '<div class="text-gray-500">Aucun log disponible</div>';
+                }
+            } catch (e) {
+                document.getElementById('logs-container').innerHTML = '<div class="text-red-400">Erreur de chargement des logs</div>';
+            }
+        }
+        function renderAccounts() { document.getElementById('main-content').innerHTML = '<div class="flex items-center justify-center h-64"><div class="animate-spin w-8 h-8 border-4 border-sidebar-active border-t-transparent rounded-full"></div></div>'; loadAccounts(); }
+
+        function renderAccountsContent() {
+            const users = usersData, isSuperAdmin = userRole === 'super_admin', isAdmin = userRole === 'admin', canCreateUsers = isSuperAdmin || isAdmin, currentUserId = '<?= $userId ?>';
+            let html = `<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6"><div><h2 class="text-xl font-semibold text-gray-800">Gestion des comptes</h2><p class="text-sm text-gray-500">${users.length} compte(s) au total</p></div>${canCreateUsers ? `<button onclick="showCreateUserModal()" class="px-4 py-2 btn-primary rounded-lg text-sm font-medium w-full sm:w-auto">+ Nouveau compte</button>` : ''}</div><div class="card"><div class="px-4 md:px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold">U</div><div><h3 class="font-semibold text-gray-800">Comptes utilisateurs</h3><p class="text-sm text-gray-500">${users.length} compte(s)</p></div></div><button onclick="loadAccounts()" class="p-2 btn-secondary rounded-lg" title="Actualiser">↻</button></div><div class="p-4 md:p-6">`;
+            if (users.length === 0) { html += `<div class="text-center py-8 text-gray-400"><p>Aucun compte</p></div>`; }
+            else {
+                html += `<div class="table-responsive"><table class="w-full min-w-[600px]"><thead><tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><th class="pb-3">Utilisateur</th><th class="pb-3">Identifiant</th><th class="pb-3">Rôle</th><th class="pb-3">Dernière connexion</th><th class="pb-3 text-right">Actions</th></tr></thead><tbody class="divide-y divide-gray-100">`;
+                users.forEach(u => {
+                    const isSU = u.role === 'super_admin', isA = u.role === 'admin', isU = u.role === 'user';
+                    let roleClass, roleLabel;
+                    if (isSU) { roleClass = 'bg-purple-100 text-purple-700'; roleLabel = 'Super Admin'; } else if (isA) { roleClass = 'bg-blue-100 text-blue-700'; roleLabel = 'Admin'; } else { roleClass = 'bg-gray-100 text-gray-700'; roleLabel = 'Utilisateur'; }
+                    const canE = isSuperAdmin, canD = isSuperAdmin && u.id !== currentUserId, canCR = isSuperAdmin && u.id !== currentUserId, canMS = isSuperAdmin && isU;
+                    const sc = u.allowed_studies?.includes('*') ? 'Toutes' : (u.allowed_studies?.length || 0);
+                    const initials = u.display_name.charAt(0).toUpperCase();
+                    const bgColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-red-500'], bgC = bgColors[u.display_name.charCodeAt(0) % bgColors.length];
+                    html += `<tr class="hover:bg-gray-50"><td class="py-3"><div class="flex items-center gap-3"><div class="w-8 h-8 ${bgC} rounded-full flex items-center justify-center text-sm font-medium text-white">${initials}</div><div><span class="font-medium text-gray-800">${esc(u.display_name)}</span>${isU ? `<p class="text-xs text-gray-400">${sc} étude(s)</p>` : ''}</div></div></td><td class="py-3 text-sm text-gray-600">${esc(u.username)}</td><td class="py-3">${canCR ? `<select onchange="changeUserRole('${u.id}', this.value)" class="filter-select px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-white"><option value="admin" ${isA ? 'selected' : ''}>Admin</option><option value="user" ${isU ? 'selected' : ''}>Utilisateur</option></select>` : `<span class="px-2 py-1 text-xs font-medium rounded ${roleClass}">${roleLabel}</span>`}</td><td class="py-3 text-sm text-gray-500">${u.last_login || 'Jamais'}</td><td class="py-3 text-right"><div class="flex items-center justify-end gap-1 flex-wrap">${canMS ? `<button onclick="showStudiesModal('${u.id}', '${esc(u.display_name)}')" class="px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition">Études</button>` : ''}${canE ? `<button onclick="showEditUserModal('${u.id}')" class="px-3 py-1 text-xs btn-secondary rounded">Modifier</button>` : ''}${canD ? `<button onclick="deleteUser('${u.id}', '${esc(u.display_name)}')" class="px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition">Suppr.</button>` : ''}</div></td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            html += `</div></div>`;
+            
+            // Section des logs (style terminal)
+            html += `<div class="card mt-6"><div class="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center gap-3"><div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-600 font-bold">L</div><div><h3 class="font-semibold text-gray-800">Journal des connexions</h3><p class="text-sm text-gray-500">Historique des activités</p></div></div><div class="p-4 md:p-6"><div id="logs-container" class="bg-gray-900 rounded-lg p-4 font-mono text-xs text-gray-300 max-h-64 overflow-y-auto scrollbar-thin">Chargement des logs...</div></div></div>`;
+            
+            document.getElementById('main-content').innerHTML = html;
+        }
+
+        function showCreateUserModal() {
+            if (userRole !== 'super_admin' && userRole !== 'admin') { alert('Accès non autorisé'); return; }
+            const isSuperAdmin = userRole === 'super_admin';
+            document.getElementById('modal-title').textContent = 'Créer un compte';
+            document.getElementById('modal-body').innerHTML = `<div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nom d'affichage</label>
+                    <input type="text" id="new-display-name" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-teal-400 focus:ring-1 focus:ring-teal-200 outline-none" placeholder="Jean Dupont">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nom d'utilisateur</label>
+                    <input type="text" id="new-username" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-teal-400 focus:ring-1 focus:ring-teal-200 outline-none" placeholder="jean.dupont">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+                    <div class="relative">
+                        <input type="password" id="new-password" class="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg focus:border-teal-400 focus:ring-1 focus:ring-teal-200 outline-none" placeholder="Min. 6 caractères">
+                        <button type="button" onclick="togglePwdVisibility('new-password', this)" class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600" title="Afficher/Masquer">
+                            <svg class="w-5 h-5 eye-show" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <svg class="w-5 h-5 eye-hide hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Confirmer le mot de passe</label>
+                    <div class="relative">
+                        <input type="password" id="new-password-confirm" class="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg focus:border-teal-400 focus:ring-1 focus:ring-teal-200 outline-none" placeholder="Retapez le mot de passe">
+                        <button type="button" onclick="togglePwdVisibility('new-password-confirm', this)" class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600" title="Afficher/Masquer">
+                            <svg class="w-5 h-5 eye-show" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <svg class="w-5 h-5 eye-hide hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                        </button>
+                    </div>
+                    <p id="pwd-match-error" class="text-xs text-red-500 mt-1 hidden">Les mots de passe ne correspondent pas</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
+                    <select id="new-role" class="filter-select w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:border-teal-400 outline-none">
+                        ${isSuperAdmin ? '<option value="super_admin">Super Admin</option><option value="admin">Admin</option>' : ''}
+                        <option value="user" selected>Utilisateur</option>
+                    </select>
+                </div>
+            </div>`;
+            document.getElementById('modal-footer').classList.remove('hidden');
+            document.getElementById('modal-footer').innerHTML = `<button onclick="closeModal()" class="px-4 py-2 text-sm btn-secondary rounded-lg">Annuler</button><button onclick="createUser()" class="px-4 py-2 text-sm btn-primary rounded-lg">Créer</button>`;
+            openModal();
+        }
+        
+        function togglePwdVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const eyeShow = btn.querySelector('.eye-show');
+            const eyeHide = btn.querySelector('.eye-hide');
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeShow.classList.add('hidden');
+                eyeHide.classList.remove('hidden');
+            } else {
+                input.type = 'password';
+                eyeShow.classList.remove('hidden');
+                eyeHide.classList.add('hidden');
             }
         }
 
-        function prevQuestion() {
-            if (previewCurrentIndex > 0) {
-                previewCurrentIndex--;
-                renderPreviewQuestion();
+        async function createUser() { 
+            const dn = document.getElementById('new-display-name').value.trim();
+            const un = document.getElementById('new-username').value.trim();
+            const pw = document.getElementById('new-password').value;
+            const pwConfirm = document.getElementById('new-password-confirm').value;
+            const role = document.getElementById('new-role').value;
+            const errorEl = document.getElementById('pwd-match-error');
+            
+            if (!dn || !un || !pw) { alert('Veuillez remplir tous les champs'); return; }
+            if (pw.length < 6) { alert('Le mot de passe doit faire au moins 6 caractères'); return; }
+            
+            if (pw !== pwConfirm) {
+                errorEl.classList.remove('hidden');
+                document.getElementById('new-password-confirm').classList.add('border-red-400');
+                return;
             }
+            errorEl.classList.add('hidden');
+            document.getElementById('new-password-confirm').classList.remove('border-red-400');
+            
+            try { 
+                const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=create&username=${encodeURIComponent(un)}&password=${encodeURIComponent(pw)}&display_name=${encodeURIComponent(dn)}&role=${encodeURIComponent(role)}` }); 
+                const data = await res.json(); 
+                if (data.success) { closeModal(); loadAccounts(); showToast('✓ Compte créé !'); } 
+                else alert('Erreur: ' + (data.error || 'Échec')); 
+            } catch (e) { 
+                console.error('Erreur création compte:', e);
+                alert('Erreur de connexion au serveur'); 
+            } 
         }
-
-        function goToQuestion(index) {
-            previewCurrentIndex = index;
-            renderPreviewQuestion();
+        function showEditUserModal(userId) { 
+            const user = usersData.find(u => u.id === userId); 
+            if (!user) return; 
+            document.getElementById('modal-title').textContent = 'Modifier le compte'; 
+            document.getElementById('modal-body').innerHTML = `<div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nom d'affichage</label>
+                    <input type="text" id="edit-display-name" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-teal-400 focus:ring-1 focus:ring-teal-200 outline-none" value="${esc(user.display_name)}">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nouveau mot de passe <span class="text-gray-400 font-normal">(laisser vide pour ne pas changer)</span></label>
+                    <div class="relative">
+                        <input type="password" id="edit-password" class="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg focus:border-teal-400 focus:ring-1 focus:ring-teal-200 outline-none" placeholder="Min. 6 caractères">
+                        <button type="button" onclick="togglePwdVisibility('edit-password', this)" class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600" title="Afficher/Masquer">
+                            <svg class="w-5 h-5 eye-show" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <svg class="w-5 h-5 eye-hide hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>`; 
+            document.getElementById('modal-footer').classList.remove('hidden'); 
+            document.getElementById('modal-footer').innerHTML = `<button onclick="closeModal()" class="px-4 py-2 text-sm btn-secondary rounded-lg">Annuler</button><button onclick="updateUser('${userId}')" class="px-4 py-2 text-sm btn-primary rounded-lg">Enregistrer</button>`; 
+            openModal(); 
         }
-
-        function jumpToQuestion() {
-            const select = document.getElementById('preview-jump');
-            previewCurrentIndex = parseInt(select.value) || 0;
-            renderPreviewQuestion();
-        }
+        async function updateUser(userId) { const dn = document.getElementById('edit-display-name').value.trim(), pw = document.getElementById('edit-password').value; if (!dn) { alert('Le nom d\'affichage est requis'); return; } if (pw && pw.length < 6) { alert('Le mot de passe doit faire au moins 6 caractères'); return; } let body = `action=update&user_id=${encodeURIComponent(userId)}&display_name=${encodeURIComponent(dn)}`; if (pw) body += `&password=${encodeURIComponent(pw)}`; try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body }); const data = await res.json(); if (data.success) { closeModal(); loadAccounts(); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function changeUserRole(userId, newRole) { try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=update&user_id=${encodeURIComponent(userId)}&role=${encodeURIComponent(newRole)}` }); const data = await res.json(); if (data.success) loadAccounts(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        async function deleteUser(userId, displayName) { if (!confirm(`Supprimer le compte "${displayName}" ?`)) return; try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=delete&user_id=${encodeURIComponent(userId)}` }); const data = await res.json(); if (data.success) loadAccounts(); else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
+        function showStudiesModal(userId, displayName) { const user = usersData.find(u => u.id === userId); if (!user) return; const us = user.allowed_studies || [], hasAll = us.includes('*'); let studiesHtml = `<div class="mb-4"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="all-studies" ${hasAll ? 'checked' : ''} onchange="toggleAllStudies(this)" class="w-4 h-4 rounded border-gray-300"><span class="font-medium">Toutes les études (actuelles et futures)</span></label></div><div id="studies-list" class="${hasAll ? 'opacity-50 pointer-events-none' : ''}"><p class="text-sm text-gray-500 mb-2">Ou sélectionnez des études spécifiques :</p><div class="space-y-2 max-h-64 overflow-y-auto">`; studiesList.forEach(s => { const isChecked = hasAll || us.includes(s.id); studiesHtml += `<label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer"><input type="checkbox" class="study-checkbox w-4 h-4 rounded border-gray-300" value="${esc(s.id)}" ${isChecked ? 'checked' : ''}><span>${esc(s.name)}</span><span class="text-xs text-gray-400">(${s.status})</span></label>`; }); studiesHtml += `</div></div>`; document.getElementById('modal-title').textContent = `Études autorisées - ${displayName}`; document.getElementById('modal-body').innerHTML = studiesHtml; document.getElementById('modal-footer').classList.remove('hidden'); document.getElementById('modal-footer').innerHTML = `<button onclick="closeModal()" class="px-4 py-2 text-sm btn-secondary rounded-lg">Annuler</button><button onclick="saveUserStudies('${userId}')" class="px-4 py-2 text-sm btn-primary rounded-lg">Enregistrer</button>`; openModal(); }
+        function toggleAllStudies(checkbox) { const list = document.getElementById('studies-list'); if (checkbox.checked) list.classList.add('opacity-50', 'pointer-events-none'); else list.classList.remove('opacity-50', 'pointer-events-none'); }
+        async function saveUserStudies(userId) { const allStudies = document.getElementById('all-studies').checked; let studies = []; if (allStudies) studies = ['*']; else document.querySelectorAll('.study-checkbox:checked').forEach(cb => studies.push(cb.value)); try { const res = await fetch('../api/users-management.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `action=update&user_id=${encodeURIComponent(userId)}&allowed_studies=${encodeURIComponent(JSON.stringify(studies))}` }); const data = await res.json(); if (data.success) { closeModal(); loadAccounts(); } else alert('Erreur: ' + (data.error || 'Échec')); } catch (e) { alert('Erreur de connexion'); } }
 
         document.getElementById('preview-modal').addEventListener('click', e => { if (e.target.id === 'preview-modal') closePreview(); });
         document.getElementById('responses-modal').addEventListener('click', e => { if (e.target.id === 'responses-modal') closeModal(); });
+        document.getElementById('study-builder-modal')?.addEventListener('click', e => { if (e.target.id === 'study-builder-modal') closeStudyBuilder(); });
+        document.getElementById('question-editor-modal')?.addEventListener('click', e => { if (e.target.id === 'question-editor-modal') closeQuestionEditor(); });
         switchTab('dashboard');
         loadData();
-        setInterval(loadData, 30000);
+        setInterval(() => { if (currentTab === 'dashboard' || (currentTab === 'studies' && !currentStudyId) || (currentTab === 'dataia' && !currentStudyId) || (currentTab === 'closed' && !currentStudyId)) loadData(); }, 30000);
     </script>
+    
+    <?php if ($adminRole === 'admin' || $adminRole === 'super_admin'): ?>
+    <?php include 'study-builder.php'; ?>
+    <?php endif; ?>
 </body>
 </html>

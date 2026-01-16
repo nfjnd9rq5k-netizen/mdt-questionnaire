@@ -1,0 +1,9 @@
+{
+    "study_id": "EVAL_IA_EXPRESS_2026",
+    "status": "active",
+    "created_at": "2026-01-15",
+    "quotas": {
+        "total_target": 500,
+        "current_complete": 0
+    }
+}

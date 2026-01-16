@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réinitialiser les tests - La Maison du Test</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #1e293b;
+            margin-bottom: 10px;
+            font-size: 1.5rem;
+        }
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+            font-size: 0.9rem;
+        }
+        .study-list {
+            margin-bottom: 20px;
+        }
+        .study-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .study-item.has-data {
+            border-color: #fbbf24;
+            background: #fef3c7;
+        }
+        .study-name {
+            font-weight: 500;
+            color: #334155;
+        }
+        .study-status {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .status-clean {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .status-used {
+            background: #fef08a;
+            color: #854d0e;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+        .success-msg {
+            display: none;
+            background: #dcfce7;
+            color: #166534;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .info-box {
+            background: #e0e7ff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #3730a3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Réinitialiser les tests</h1>
+        <p class="subtitle">Efface les cookies pour pouvoir refaire les questionnaires</p>
+        
+        <div class="study-list" id="study-list">
+            <!-- Généré dynamiquement -->
+        </div>
+        
+        <button class="btn btn-danger" onclick="clearAll()">
+            🗑️ Tout effacer
+        </button>
+        
+        <button class="btn btn-secondary" onclick="location.reload()">
+            🔄 Rafraîchir la liste
+        </button>
+        
+        <div class="success-msg" id="success-msg">
+            ✅ Données effacées ! Tu peux refaire les questionnaires.
+        </div>
+        
+        <div class="info-box">
+            💡 <strong>Astuce :</strong> Cette page efface uniquement les données stockées par les questionnaires dans ton navigateur. Elle ne supprime pas tes réponses enregistrées sur le serveur.
+        </div>
+    </div>
+
+    <script>
+        // Liste des études connues
+        const STUDIES = [
+            'DATA_IA_JAN2026',
+            'CULTURE_FR_2026',
+            'PREF_STYLE_FR_2026',
+            'SECHE_CHEVEUX_MDT_JAN2026',
+            'SHARK_INHOME_JAN2026',
+            'FM_EXPLO_TP_JAN2025'
+        ];
+
+        function checkStudyStatus() {
+            const listEl = document.getElementById('study-list');
+            listEl.innerHTML = '';
+            
+            STUDIES.forEach(studyId => {
+                const key = `participated_${studyId}`;
+                const hasData = localStorage.getItem(key) !== null;
+                
+                const item = document.createElement('div');
+                item.className = 'study-item' + (hasData ? ' has-data' : '');
+                item.innerHTML = `
+                    <span class="study-name">${studyId}</span>
+                    <span class="study-status ${hasData ? 'status-used' : 'status-clean'}">
+                        ${hasData ? '⚠️ Déjà fait' : '✓ Disponible'}
+                    </span>
+                `;
+                listEl.appendChild(item);
+            });
+            
+            // Vérifier aussi les backups
+            let backupCount = 0;
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('backup_')) {
+                    backupCount++;
+                }
+            }
+            
+            if (backupCount > 0) {
+                const item = document.createElement('div');
+                item.className = 'study-item has-data';
+                item.innerHTML = `
+                    <span class="study-name">Sauvegardes locales</span>
+                    <span class="study-status status-used">${backupCount} fichier(s)</span>
+                `;
+                listEl.appendChild(item);
+            }
+        }
+
+        function clearAll() {
+            // Effacer les participations
+            STUDIES.forEach(studyId => {
+                localStorage.removeItem(`participated_${studyId}`);
+            });
+            
+            // Effacer les backups
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('backup_')) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            
+            // Afficher le message de succès
+            document.getElementById('success-msg').style.display = 'block';
+            
+            // Rafraîchir la liste
+            checkStudyStatus();
+        }
+
+        // Initialiser au chargement
+        checkStudyStatus();
+    </script>
+</body>
+</html>

@@ -1,10 +1,21 @@
 <?php
+/**
+ * ============================================================
+ * API DONNÉES ADMIN - VERSION MYSQL HYBRIDE
+ * ============================================================
+ * Combine le parsing des quotas original avec lecture MySQL
+ */
+
 session_start();
 header('Content-Type: application/json');
 
-require_once 'config.php';
+require_once 'db.php';
 
-define('REFUSED_FILE', __DIR__ . '/secure_data/refused.enc');
+define('SESSION_TIMEOUT', 3600);
+
+// ============================================================
+// VÉRIFICATION D'AUTHENTIFICATION
+// ============================================================
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     http_response_code(401);
@@ -21,269 +32,170 @@ if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 
 }
 $_SESSION['last_activity'] = time();
 
+// ============================================================
+// TRAITEMENT DES REQUÊTES POST (actions)
+// ============================================================
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $action = $input['action'] ?? '';
     
     if ($action === 'delete_participant') {
-        $studyId = $input['studyId'] ?? '';
         $participantId = $input['participantId'] ?? '';
         
-        if (empty($studyId) || empty($participantId)) {
-            echo json_encode(['success' => false, 'error' => 'Paramètres manquants']);
+        if (empty($participantId)) {
+            echo json_encode(['success' => false, 'error' => 'ID participant manquant']);
             exit;
         }
         
-        $studyDataDir = __DIR__ . '/../studies/' . $studyId . '/data';
-        $responsesFile = $studyDataDir . '/responses.enc';
-        $refusedFile = $studyDataDir . '/refused.enc';
-        
-        $deleted = false;
-        
-        if (file_exists($responsesFile)) {
-            $content = file_get_contents($responsesFile);
-            $responses = decryptData($content) ?: [];
+        try {
+            $response = dbQueryOne("SELECT id FROM responses WHERE unique_id = ?", [$participantId]);
             
-            $originalCount = count($responses);
-            $responses = array_filter($responses, function($r) use ($participantId) {
-                return $r['id'] !== $participantId;
-            });
-            
-            if (count($responses) < $originalCount) {
-                $deleted = true;
-                $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
-                $encrypted = openssl_encrypt(json_encode(array_values($responses)), 'AES-256-CBC', ENCRYPTION_KEY, 0, $iv);
-                file_put_contents($responsesFile, base64_encode($iv . '::' . $encrypted));
+            if ($response) {
+                dbExecute("DELETE FROM responses WHERE id = ?", [$response['id']]);
+                echo json_encode(['success' => true, 'message' => 'Participant supprimé']);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Participant non trouvé']);
             }
-        }
-        
-        if (!$deleted && file_exists($refusedFile)) {
-            $content = file_get_contents($refusedFile);
-            $refused = decryptData($content) ?: [];
-            
-            $originalCount = count($refused);
-            $refused = array_filter($refused, function($r) use ($participantId) {
-                return $r['id'] !== $participantId;
-            });
-            
-            if (count($refused) < $originalCount) {
-                $deleted = true;
-                $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
-                $encrypted = openssl_encrypt(json_encode(array_values($refused)), 'AES-256-CBC', ENCRYPTION_KEY, 0, $iv);
-                file_put_contents($refusedFile, base64_encode($iv . '::' . $encrypted));
-            }
-        }
-        
-        if ($deleted) {
-            echo json_encode(['success' => true, 'message' => 'Participant supprimé']);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Participant non trouvé']);
-        }
-        exit;
-    }
-    
-    if ($action === 'update_responses') {
-        $studyFolder = $input['studyFolder'] ?? '';
-        $participantId = $input['participantId'] ?? '';
-        $newReponses = $input['reponses'] ?? [];
-        
-        if (empty($studyFolder) || empty($participantId)) {
-            echo json_encode(['success' => false, 'error' => 'Paramètres manquants']);
-            exit;
-        }
-        
-        $studyDataDir = __DIR__ . '/../studies/' . $studyFolder . '/data';
-        $responsesFile = $studyDataDir . '/responses.enc';
-        $refusedFile = $studyDataDir . '/refused.enc';
-        
-        $updated = false;
-        
-        $saveEncrypted = function($data, $file) {
-            $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
-            $encrypted = openssl_encrypt(json_encode($data), 'AES-256-CBC', ENCRYPTION_KEY, 0, $iv);
-            return file_put_contents($file, base64_encode($iv . '::' . $encrypted));
-        };
-        
-        if (file_exists($responsesFile)) {
-            $content = file_get_contents($responsesFile);
-            $responses = decryptData($content) ?: [];
-            
-            foreach ($responses as &$response) {
-                if ($response['id'] === $participantId) {
-                    $response['reponses'] = $newReponses;
-                    $response['dateModification'] = date('c');
-                    $response['modifiePar'] = 'admin';
-                    $updated = true;
-                    break;
-                }
-            }
-            
-            if ($updated) {
-                $saveEncrypted(array_values($responses), $responsesFile);
-            }
-        }
-        
-        if (!$updated && file_exists($refusedFile)) {
-            $content = file_get_contents($refusedFile);
-            $refused = decryptData($content) ?: [];
-            
-            foreach ($refused as &$response) {
-                if ($response['id'] === $participantId) {
-                    $response['reponses'] = $newReponses;
-                    $response['dateModification'] = date('c');
-                    $response['modifiePar'] = 'admin';
-                    $updated = true;
-                    break;
-                }
-            }
-            
-            if ($updated) {
-                $saveEncrypted(array_values($refused), $refusedFile);
-            }
-        }
-        
-        if ($updated) {
-            echo json_encode(['success' => true, 'message' => 'Réponses mises à jour']);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Participant non trouvé']);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
         exit;
     }
     
     if ($action === 'update_participant') {
-        $studyFolder = $input['studyFolder'] ?? '';
         $participantId = $input['participantId'] ?? '';
         $newSignaletique = $input['signaletique'] ?? [];
         $newHoraire = $input['horaire'] ?? '';
         $newReponses = $input['reponses'] ?? [];
         
-        if (empty($studyFolder) || empty($participantId)) {
-            echo json_encode(['success' => false, 'error' => 'Paramètres manquants']);
+        if (empty($participantId)) {
+            echo json_encode(['success' => false, 'error' => 'ID participant manquant']);
             exit;
         }
         
-        $studyDataDir = __DIR__ . '/../studies/' . $studyFolder . '/data';
-        $responsesFile = $studyDataDir . '/responses.enc';
-        $refusedFile = $studyDataDir . '/refused.enc';
-        
-        $updated = false;
-        
-        $saveEncrypted = function($data, $file) {
-            $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
-            $encrypted = openssl_encrypt(json_encode($data), 'AES-256-CBC', ENCRYPTION_KEY, 0, $iv);
-            return file_put_contents($file, base64_encode($iv . '::' . $encrypted));
-        };
-        
-        if (file_exists($responsesFile)) {
-            $content = file_get_contents($responsesFile);
-            $responses = decryptData($content) ?: [];
+        try {
+            dbBeginTransaction();
             
-            foreach ($responses as &$response) {
-                if ($response['id'] === $participantId) {
-                    if (!isset($response['signaletique'])) $response['signaletique'] = [];
-                    foreach ($newSignaletique as $key => $value) {
-                        if ($key !== 'horaire') {
-                            $response['signaletique'][$key] = $value;
-                        }
-                    }
-                    if (!empty($newHoraire)) {
-                        $response['horaire'] = $newHoraire;
-                    }
-                    $response['reponses'] = $newReponses;
-                    $response['dateModification'] = date('c');
-                    $response['modifiePar'] = 'admin';
-                    $updated = true;
-                    break;
+            $response = dbQueryOne("SELECT id FROM responses WHERE unique_id = ?", [$participantId]);
+            
+            if (!$response) {
+                throw new Exception('Participant non trouvé');
+            }
+            
+            $responseId = $response['id'];
+            
+            if ($newHoraire !== '') {
+                dbExecute(
+                    "UPDATE responses SET horaire = ?, modified_at = NOW(), modified_by = 'admin' WHERE id = ?",
+                    [$newHoraire, $responseId]
+                );
+            }
+            
+            if (!empty($newSignaletique)) {
+                $existingSig = dbQueryOne("SELECT id FROM signaletiques WHERE response_id = ?", [$responseId]);
+                
+                if ($existingSig) {
+                    dbExecute(
+                        "UPDATE signaletiques SET 
+                            nom = COALESCE(?, nom), prenom = COALESCE(?, prenom),
+                            email = COALESCE(?, email), telephone = COALESCE(?, telephone),
+                            adresse = COALESCE(?, adresse), code_postal = COALESCE(?, code_postal),
+                            ville = COALESCE(?, ville)
+                         WHERE response_id = ?",
+                        [
+                            $newSignaletique['nom'] ?? null, $newSignaletique['prenom'] ?? null,
+                            $newSignaletique['email'] ?? null, $newSignaletique['telephone'] ?? null,
+                            $newSignaletique['adresse'] ?? null, $newSignaletique['codePostal'] ?? null,
+                            $newSignaletique['ville'] ?? null, $responseId
+                        ]
+                    );
+                } else {
+                    dbExecute(
+                        "INSERT INTO signaletiques (response_id, nom, prenom, email, telephone, adresse, code_postal, ville)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        [
+                            $responseId, $newSignaletique['nom'] ?? null, $newSignaletique['prenom'] ?? null,
+                            $newSignaletique['email'] ?? null, $newSignaletique['telephone'] ?? null,
+                            $newSignaletique['adresse'] ?? null, $newSignaletique['codePostal'] ?? null,
+                            $newSignaletique['ville'] ?? null
+                        ]
+                    );
                 }
             }
             
-            if ($updated) {
-                $saveEncrypted(array_values($responses), $responsesFile);
-            }
-        }
-        
-        if (!$updated && file_exists($refusedFile)) {
-            $content = file_get_contents($refusedFile);
-            $refused = decryptData($content) ?: [];
-            
-            foreach ($refused as &$response) {
-                if ($response['id'] === $participantId) {
-                    if (!isset($response['signaletique'])) $response['signaletique'] = [];
-                    foreach ($newSignaletique as $key => $value) {
-                        if ($key !== 'horaire') {
-                            $response['signaletique'][$key] = $value;
-                        }
-                    }
-                    if (!empty($newHoraire)) {
-                        $response['horaire'] = $newHoraire;
-                    }
-                    $response['reponses'] = $newReponses;
-                    $response['dateModification'] = date('c');
-                    $response['modifiePar'] = 'admin';
-                    $updated = true;
-                    break;
-                }
+            foreach ($newReponses as $questionId => $answer) {
+                $answerValue = $answer['value'] ?? null;
+                $answerValues = isset($answer['values']) ? json_encode($answer['values']) : null;
+                $answerText = $answer['text'] ?? null;
+                $complexData = array_diff_key($answer, array_flip(['value', 'values', 'text']));
+                $answerData = !empty($complexData) ? json_encode($complexData) : null;
+                
+                dbExecute(
+                    "INSERT INTO answers (response_id, question_id, answer_value, answer_values, answer_text, answer_data)
+                     VALUES (?, ?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE 
+                        answer_value = VALUES(answer_value), answer_values = VALUES(answer_values),
+                        answer_text = VALUES(answer_text), answer_data = VALUES(answer_data), updated_at = NOW()",
+                    [$responseId, $questionId, $answerValue, $answerValues, $answerText, $answerData]
+                );
             }
             
-            if ($updated) {
-                $saveEncrypted(array_values($refused), $refusedFile);
-            }
-        }
-        
-        if ($updated) {
+            dbCommit();
             echo json_encode(['success' => true, 'message' => 'Participant mis à jour']);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Participant non trouvé']);
+            
+        } catch (Exception $e) {
+            dbRollback();
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
         exit;
     }
     
-    if ($action === 'get_access_ids') {
-        $studyFolder = $input['studyFolder'] ?? '';
+    if ($action === 'update_responses') {
+        $participantId = $input['participantId'] ?? '';
+        $newReponses = $input['reponses'] ?? [];
         
-        if (empty($studyFolder)) {
-            echo json_encode(['success' => false, 'error' => 'Paramètres manquants']);
+        if (empty($participantId)) {
+            echo json_encode(['success' => false, 'error' => 'ID participant manquant']);
             exit;
         }
         
-        $studyFolder = preg_replace('/[^a-zA-Z0-9_-]/', '', $studyFolder);
-        $dataDir = __DIR__ . '/../studies/' . $studyFolder . '/data';
-        $accessFile = $dataDir . '/access_ids.json';
-        $responsesFile = $dataDir . '/responses.enc';
-        $refusedFile = $dataDir . '/refused.enc';
-        
-        // Créer le dossier data s'il n'existe pas
-        if (!file_exists($dataDir)) {
-            mkdir($dataDir, 0755, true);
-        }
-        
-        $ids = [];
-        if (file_exists($accessFile)) {
-            $data = json_decode(file_get_contents($accessFile), true);
-            $ids = $data['ids'] ?? [];
-        }
-        
-        $usedIds = [];
-        if (file_exists($responsesFile)) {
-            $content = file_get_contents($responsesFile);
-            $responses = decryptData($content) ?: [];
-            foreach ($responses as $r) {
-                if (!empty($r['accessId'])) {
-                    $usedIds[] = $r['accessId'];
-                }
+        try {
+            $response = dbQueryOne("SELECT id FROM responses WHERE unique_id = ?", [$participantId]);
+            
+            if (!$response) {
+                echo json_encode(['success' => false, 'error' => 'Participant non trouvé']);
+                exit;
             }
-        }
-        if (file_exists($refusedFile)) {
-            $content = file_get_contents($refusedFile);
-            $refused = decryptData($content) ?: [];
-            foreach ($refused as $r) {
-                if (!empty($r['accessId'])) {
-                    $usedIds[] = $r['accessId'];
-                }
+            
+            dbBeginTransaction();
+            
+            foreach ($newReponses as $questionId => $answer) {
+                $answerValue = $answer['value'] ?? null;
+                $answerValues = isset($answer['values']) ? json_encode($answer['values']) : null;
+                $answerText = $answer['text'] ?? null;
+                $complexData = array_diff_key($answer, array_flip(['value', 'values', 'text']));
+                $answerData = !empty($complexData) ? json_encode($complexData) : null;
+                
+                dbExecute(
+                    "INSERT INTO answers (response_id, question_id, answer_value, answer_values, answer_text, answer_data)
+                     VALUES (?, ?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE 
+                        answer_value = VALUES(answer_value), answer_values = VALUES(answer_values),
+                        answer_text = VALUES(answer_text), answer_data = VALUES(answer_data), updated_at = NOW()",
+                    [$response['id'], $questionId, $answerValue, $answerValues, $answerText, $answerData]
+                );
             }
+            
+            dbExecute("UPDATE responses SET modified_at = NOW(), modified_by = 'admin' WHERE id = ?", [$response['id']]);
+            
+            dbCommit();
+            echo json_encode(['success' => true, 'message' => 'Réponses mises à jour']);
+            
+        } catch (Exception $e) {
+            dbRollback();
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
-        
-        echo json_encode(['success' => true, 'ids' => $ids, 'usedIds' => array_values(array_unique($usedIds))]);
         exit;
     }
     
@@ -296,160 +208,212 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        $studyFolder = preg_replace('/[^a-zA-Z0-9_-]/', '', $studyFolder);
-        $dataDir = __DIR__ . '/../studies/' . $studyFolder . '/data';
-        $accessFile = $dataDir . '/access_ids.json';
-        
-        if (!file_exists($dataDir)) {
-            mkdir($dataDir, 0755, true);
-        }
-        
-        $existingIds = [];
-        if (file_exists($accessFile)) {
-            $data = json_decode(file_get_contents($accessFile), true);
-            $existingIds = $data['ids'] ?? [];
-        }
-        
-        foreach ($newIds as $id) {
-            $id = trim($id);
-            if (!empty($id) && !in_array($id, $existingIds)) {
-                $existingIds[] = $id;
+        try {
+            $study = dbQueryOne("SELECT id FROM studies WHERE folder_name = ? OR study_id = ?", [$studyFolder, $studyFolder]);
+            
+            $added = 0;
+            if ($study) {
+                foreach ($newIds as $accessCode) {
+                    $accessCode = trim($accessCode);
+                    if (empty($accessCode)) continue;
+                    
+                    $existing = dbQueryOne("SELECT id FROM access_ids WHERE study_id = ? AND access_code = ?", [$study['id'], $accessCode]);
+                    
+                    if (!$existing) {
+                        dbExecute("INSERT INTO access_ids (study_id, access_code) VALUES (?, ?)", [$study['id'], $accessCode]);
+                        $added++;
+                    }
+                }
             }
+            
+            // Mettre à jour aussi le fichier JSON
+            $accessIdsFile = __DIR__ . '/../studies/' . $studyFolder . '/data/access_ids.json';
+            $existingIds = [];
+            if (file_exists($accessIdsFile)) {
+                $existingIds = json_decode(file_get_contents($accessIdsFile), true) ?: [];
+            }
+            $allIds = array_unique(array_merge($existingIds, $newIds));
+            sort($allIds);
+            
+            $dataDir = dirname($accessIdsFile);
+            if (!file_exists($dataDir)) {
+                mkdir($dataDir, 0755, true);
+            }
+            file_put_contents($accessIdsFile, json_encode(array_values($allIds)));
+            
+            echo json_encode(['success' => true, 'message' => "$added ID(s) ajouté(s)", 'added' => $added]);
+            
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
-        
-        file_put_contents($accessFile, json_encode([
-            'ids' => $existingIds,
-            'lastModified' => date('c')
-        ], JSON_PRETTY_PRINT));
-        
-        echo json_encode(['success' => true, 'message' => 'IDs ajoutés', 'count' => count($existingIds)]);
         exit;
     }
     
-    if ($action === 'remove_access_id') {
+    // ============================================================
+    // ACTION : Récupérer les IDs d'accès configurés
+    // ============================================================
+    if ($action === 'get_access_ids') {
         $studyFolder = $input['studyFolder'] ?? '';
-        $idToRemove = $input['id'] ?? '';
         
-        if (empty($studyFolder) || empty($idToRemove)) {
+        if (empty($studyFolder)) {
             echo json_encode(['success' => false, 'error' => 'Paramètres manquants']);
             exit;
         }
         
-        $studyFolder = preg_replace('/[^a-zA-Z0-9_-]/', '', $studyFolder);
-        $accessFile = __DIR__ . '/../studies/' . $studyFolder . '/data/access_ids.json';
-        
-        if (!file_exists($accessFile)) {
-            echo json_encode(['success' => false, 'error' => 'Fichier non trouvé']);
-            exit;
+        try {
+            // Récupérer depuis MySQL
+            $study = dbQueryOne("SELECT id FROM studies WHERE folder_name = ? OR study_id = ?", [$studyFolder, $studyFolder]);
+            
+            $ids = [];
+            $usedIds = [];
+            
+            if ($study) {
+                // Récupérer tous les IDs configurés depuis MySQL
+                $accessIds = dbQuery("SELECT access_code FROM access_ids WHERE study_id = ? ORDER BY access_code", [$study['id']]);
+                foreach ($accessIds as $row) {
+                    $ids[] = $row['access_code'];
+                }
+                
+                // Récupérer les IDs déjà utilisés par les participants
+                $responses = dbQuery("SELECT access_id FROM responses WHERE study_id = ? AND access_id IS NOT NULL AND access_id != ''", [$study['id']]);
+                foreach ($responses as $row) {
+                    $usedIds[] = $row['access_id'];
+                }
+            }
+            
+            // Fallback: lire depuis le fichier JSON si pas dans MySQL
+            if (empty($ids)) {
+                $accessIdsFile = __DIR__ . '/../studies/' . $studyFolder . '/data/access_ids.json';
+                if (file_exists($accessIdsFile)) {
+                    $fileIds = json_decode(file_get_contents($accessIdsFile), true) ?: [];
+                    // Nettoyer les IDs (enlever les tableaux imbriqués et valeurs invalides)
+                    foreach ($fileIds as $id) {
+                        if (is_string($id) && !empty(trim($id)) && !strpos($id, 'T') && strlen($id) < 50) {
+                            $ids[] = trim($id);
+                        } elseif (is_array($id)) {
+                            // Gérer les tableaux imbriqués
+                            foreach ($id as $subId) {
+                                if (is_string($subId) && !empty(trim($subId))) {
+                                    $ids[] = trim($subId);
+                                }
+                            }
+                        }
+                    }
+                    $ids = array_unique($ids);
+                    sort($ids);
+                }
+            }
+            
+            echo json_encode(['success' => true, 'ids' => array_values($ids), 'usedIds' => array_values(array_unique($usedIds))]);
+            
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
-        
-        $data = json_decode(file_get_contents($accessFile), true);
-        $ids = $data['ids'] ?? [];
-        
-        $ids = array_values(array_filter($ids, function($id) use ($idToRemove) {
-            return $id !== $idToRemove;
-        }));
-        
-        file_put_contents($accessFile, json_encode([
-            'ids' => $ids,
-            'lastModified' => date('c')
-        ], JSON_PRETTY_PRINT));
-        
-        echo json_encode(['success' => true, 'message' => 'ID supprimé']);
         exit;
     }
     
-    echo json_encode(['success' => false, 'error' => 'Action non reconnue']);
-    exit;
-}
-
-function decryptData($encryptedData) {
-    $parts = explode('::', base64_decode($encryptedData), 2);
-    if (count($parts) !== 2) return null;
-    
-    list($iv, $encrypted) = $parts;
-    $decrypted = openssl_decrypt($encrypted, 'AES-256-CBC', ENCRYPTION_KEY, 0, $iv);
-    return json_decode($decrypted, true);
-}
-
-function loadResponses($file) {
-    if (!file_exists($file)) {
-        return [];
-    }
-    $content = file_get_contents($file);
-    return decryptData($content) ?: [];
-}
-function detectStudies() {
-    $studiesDir = __DIR__ . '/../studies';
-    $studies = [];
-    
-    if (is_dir($studiesDir)) {
-        $dirs = scandir($studiesDir);
-        foreach ($dirs as $dir) {
-            if ($dir === '.' || $dir === '..' || strpos($dir, '_') === 0) {
-                continue;
+    if ($action === 'delete_access_id') {
+        $studyFolder = $input['studyFolder'] ?? '';
+        $accessCode = $input['accessCode'] ?? $input['id'] ?? '';
+        
+        if (empty($studyFolder) || empty($accessCode)) {
+            echo json_encode(['success' => false, 'error' => 'Paramètres manquants']);
+            exit;
+        }
+        
+        try {
+            $study = dbQueryOne("SELECT id FROM studies WHERE folder_name = ? OR study_id = ?", [$studyFolder, $studyFolder]);
+            
+            if ($study) {
+                dbExecute("DELETE FROM access_ids WHERE study_id = ? AND access_code = ?", [$study['id'], $accessCode]);
             }
             
-            $questionFile = $studiesDir . '/' . $dir . '/questions.js';
-            if (file_exists($questionFile)) {
-                $config = parseStudyConfig($questionFile);
-                if ($config) {
-                    $config['folder'] = $dir;
-                    
-                    $statusFile = $studiesDir . '/' . $dir . '/status.json';
-                    if (file_exists($statusFile)) {
-                        $statusData = json_decode(file_get_contents($statusFile), true);
-                        $config['status'] = $statusData['status'] ?? 'active';
-                        $config['closedAt'] = $statusData['closedAt'] ?? null;
-                    } else {
-                        $config['status'] = 'active';
-                        $config['closedAt'] = null;
-                    }
-                    
-                    $studies[] = $config;
-                }
+            $accessIdsFile = __DIR__ . '/../studies/' . $studyFolder . '/data/access_ids.json';
+            if (file_exists($accessIdsFile)) {
+                $ids = json_decode(file_get_contents($accessIdsFile), true) ?: [];
+                $ids = array_filter($ids, fn($id) => $id !== $accessCode);
+                file_put_contents($accessIdsFile, json_encode(array_values($ids)));
             }
+            
+            echo json_encode(['success' => true, 'message' => 'ID supprimé']);
+            
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
+        exit;
     }
     
-    $legacyFile = __DIR__ . '/../data/questions.js';
-    if (file_exists($legacyFile) && empty($studies)) {
-        $config = parseStudyConfig($legacyFile);
-        if ($config) {
-            $config['folder'] = '_legacy';
-            $config['status'] = 'active';
-            $config['closedAt'] = null;
-            $studies[] = $config;
+    // Action : Récupérer les logs de connexion
+    if ($action === 'get_logs') {
+        try {
+            $logs = dbQuery(
+                "SELECT action, username, ip_address, details, created_at 
+                 FROM admin_logs 
+                 ORDER BY created_at DESC 
+                 LIMIT 100"
+            );
+            
+            // Formater les logs comme du texte
+            $logsText = '';
+            foreach ($logs as $log) {
+                $line = $log['created_at'] . ' - ';
+                if ($log['action'] === 'login_success') {
+                    $line .= "Connexion réussie: " . ($log['username'] ?? 'inconnu');
+                } elseif ($log['action'] === 'login_failed') {
+                    $line .= "Tentative échouée pour: " . ($log['username'] ?? 'inconnu');
+                } elseif ($log['action'] === 'logout') {
+                    $line .= "Déconnexion: " . ($log['username'] ?? 'inconnu');
+                } else {
+                    $line .= ($log['details'] ?? $log['action']);
+                }
+                $logsText .= $line . "\n";
+            }
+            
+            echo json_encode(['success' => true, 'logs' => $logsText]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => true, 'logs' => 'Erreur de chargement des logs: ' . $e->getMessage()]);
         }
+        exit;
     }
     
-    return $studies;
+    // Action : Déplacer un participant refusé vers les qualifiés
+    if ($action === 'move_to_qualified') {
+        $studyId = $input['studyId'] ?? '';
+        $participantId = $input['participantId'] ?? '';
+        
+        if (empty($participantId)) {
+            echo json_encode(['success' => false, 'error' => 'ID participant manquant']);
+            exit;
+        }
+        
+        try {
+            // Trouver la réponse
+            $response = dbQueryOne("SELECT id, status FROM responses WHERE unique_id = ?", [$participantId]);
+            
+            if (!$response) {
+                echo json_encode(['success' => false, 'error' => 'Participant non trouvé']);
+                exit;
+            }
+            
+            // Mettre à jour le statut vers QUALIFIE
+            dbExecute(
+                "UPDATE responses SET status = 'QUALIFIE', stop_reason = NULL, all_stop_reasons = NULL, modified_at = NOW(), modified_by = 'admin' WHERE id = ?",
+                [$response['id']]
+            );
+            
+            echo json_encode(['success' => true, 'message' => 'Participant déplacé vers les qualifiés']);
+            
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
 }
 
-function parseStudyConfig($filePath) {
-    $content = file_get_contents($filePath);
-    $config = [];
-    
-    if (preg_match("/studyId:\s*['\"]([^'\"]+)['\"]/", $content, $matches)) {
-        $config['studyId'] = $matches[1];
-    } else {
-        return null;
-    }
-    
-    if (preg_match("/studyTitle:\s*['\"]([^'\"]+)['\"]/", $content, $matches)) {
-        $config['studyTitle'] = $matches[1];
-    }
-    if (preg_match("/studyDate:\s*['\"]([^'\"]+)['\"]/", $content, $matches)) {
-        $config['studyDate'] = $matches[1];
-    }
-    if (preg_match("/totalParticipants:\s*(\d+)/", $content, $matches)) {
-        $config['totalParticipants'] = intval($matches[1]);
-    }
-    
-    $config['quotas'] = parseQuotasFromContent($content);
-    
-    return $config;
-}
+// ============================================================
+// FONCTIONS DE PARSING DES QUOTAS (depuis l'original)
+// ============================================================
+
 function parseQuotasFromContent($content) {
     $quotas = [];
     
@@ -507,9 +471,16 @@ function parseQuotaBlock($block) {
     if (preg_match("/id:\s*['\"]([^'\"]+)['\"]/", $block, $m)) {
         $quota['id'] = $m[1];
     }
-    if (preg_match("/titre:\s*['\"]([^'\"]+)['\"]/", $block, $m)) {
+    
+    // Gérer les apostrophes échappées dans le titre
+    if (preg_match("/titre:\s*'((?:[^'\\\\]|\\\\.)*)'/", $block, $m)) {
+        $quota['titre'] = stripslashes($m[1]);
+    } elseif (preg_match('/titre:\s*"((?:[^"\\\\]|\\\\.)*)"/', $block, $m)) {
+        $quota['titre'] = stripslashes($m[1]);
+    } elseif (preg_match("/titre:\s*['\"]([^'\"]+)['\"]/", $block, $m)) {
         $quota['titre'] = $m[1];
     }
+    
     if (preg_match("/type:\s*['\"]([^'\"]+)['\"]/", $block, $m)) {
         $quota['type'] = $m[1];
     }
@@ -594,6 +565,7 @@ function parseQuotaBlock($block) {
     
     return $quota;
 }
+
 function calculateQuotas($qualifies, $quotasConfig) {
     $results = [];
     
@@ -662,6 +634,7 @@ function calculateQuotas($qualifies, $quotasConfig) {
         $results[] = $quota;
     }
     
+    // Horaires
     $horaires = [];
     foreach ($qualifies as $q) {
         $h = $q['horaire'] ?? 'Non défini';
@@ -688,126 +661,495 @@ function calculateQuotas($qualifies, $quotasConfig) {
     
     return $results;
 }
-function getStudyDataFiles($studyFolder) {
-    $dataDir = __DIR__ . '/../studies/' . $studyFolder . '/data';
+
+// ============================================================
+// FONCTIONS DE DÉTECTION ET CHARGEMENT
+// ============================================================
+
+function detectStudies() {
+    $studiesDir = __DIR__ . '/../studies';
+    $studies = [];
+    
+    if (is_dir($studiesDir)) {
+        $dirs = scandir($studiesDir);
+        foreach ($dirs as $dir) {
+            if ($dir === '.' || $dir === '..' || strpos($dir, '_') === 0 || $dir === 'closed.html') {
+                continue;
+            }
+            
+            $questionFile = $studiesDir . '/' . $dir . '/questions.js';
+            if (file_exists($questionFile)) {
+                $config = parseStudyConfig($questionFile);
+                if ($config) {
+                    $config['folder'] = $dir;
+                    
+                    $statusFile = $studiesDir . '/' . $dir . '/status.json';
+                    if (file_exists($statusFile)) {
+                        $statusData = json_decode(file_get_contents($statusFile), true);
+                        $config['status'] = $statusData['status'] ?? 'active';
+                        $config['closedAt'] = $statusData['closedAt'] ?? null;
+                    } else {
+                        $config['status'] = 'active';
+                        $config['closedAt'] = null;
+                    }
+                    
+                    // S'assurer que l'étude existe dans MySQL
+                    // Essayer d'abord avec study_type, sinon sans
+                    $dbStudy = null;
+                    try {
+                        $dbStudy = dbQueryOne(
+                            "SELECT id, study_type FROM studies WHERE study_id = ? OR folder_name = ?",
+                            [$config['studyId'], $dir]
+                        );
+                    } catch (Exception $e) {
+                        // Fallback si study_type n'existe pas
+                        $dbStudy = dbQueryOne(
+                            "SELECT id FROM studies WHERE study_id = ? OR folder_name = ?",
+                            [$config['studyId'], $dir]
+                        );
+                    }
+                    
+                    // Détecter le type d'étude depuis le fichier (anonymousMode = data_collection)
+                    // IMPORTANT: Lire le contenu du fichier pour la détection
+                    $fileContent = file_get_contents($questionFile);
+                    $detectedType = 'classic';
+                    if (preg_match("/anonymousMode:\s*true/", $fileContent)) {
+                        $detectedType = 'data_collection';
+                    }
+                    
+                    if (!$dbStudy) {
+                        // Essayer d'insérer avec study_type, sinon sans
+                        try {
+                            dbExecute(
+                                "INSERT INTO studies (study_id, folder_name, title, study_date, status, study_type) VALUES (?, ?, ?, ?, ?, ?)",
+                                [$config['studyId'], $dir, $config['studyTitle'] ?? $dir, $config['studyDate'] ?? '', $config['status'], $detectedType]
+                            );
+                        } catch (Exception $e) {
+                            // Fallback sans study_type
+                            dbExecute(
+                                "INSERT INTO studies (study_id, folder_name, title, study_date, status) VALUES (?, ?, ?, ?, ?)",
+                                [$config['studyId'], $dir, $config['studyTitle'] ?? $dir, $config['studyDate'] ?? '', $config['status']]
+                            );
+                        }
+                        $config['dbId'] = dbLastId();
+                        $config['studyType'] = $detectedType;
+                    } else {
+                        $config['dbId'] = $dbStudy['id'];
+                        // TOUJOURS utiliser le type détecté depuis le fichier (source de vérité)
+                        $config['studyType'] = $detectedType;
+                        
+                        // Mettre à jour le type en base si différent
+                        if (($dbStudy['study_type'] ?? 'classic') !== $detectedType) {
+                            try {
+                                dbExecute("UPDATE studies SET study_type = ? WHERE id = ?", [$detectedType, $dbStudy['id']]);
+                            } catch (Exception $e) {
+                                // Ignorer si la colonne n'existe pas
+                            }
+                        }
+                    }
+                    
+                    // Synchroniser les IDs d'accès depuis le fichier JSON vers MySQL
+                    syncAccessIds($config['dbId'], $studiesDir . '/' . $dir);
+                    
+                    $studies[] = $config;
+                }
+            }
+        }
+    }
+    
+    return $studies;
+}
+
+/**
+ * Synchronise les IDs d'accès d'un fichier JSON vers MySQL
+ */
+function syncAccessIds($studyDbId, $studyPath) {
+    $accessIdsFile = $studyPath . '/data/access_ids.json';
+    if (!file_exists($accessIdsFile)) {
+        return;
+    }
+    
+    $fileIds = json_decode(file_get_contents($accessIdsFile), true);
+    if (!is_array($fileIds)) {
+        return;
+    }
+    
+    // Fonction récursive pour aplatir les tableaux imbriqués
+    $flattenIds = function($arr) use (&$flattenIds) {
+        $result = [];
+        foreach ($arr as $item) {
+            if (is_array($item)) {
+                $result = array_merge($result, $flattenIds($item));
+            } elseif (is_string($item) && !empty(trim($item))) {
+                $result[] = trim($item);
+            }
+        }
+        return $result;
+    };
+    
+    $allIds = array_unique($flattenIds($fileIds));
+    
+    foreach ($allIds as $accessCode) {
+        // Vérifier si l'ID existe déjà dans MySQL
+        $existing = dbQueryOne(
+            "SELECT id FROM access_ids WHERE study_id = ? AND access_code = ?",
+            [$studyDbId, $accessCode]
+        );
+        
+        if (!$existing) {
+            try {
+                dbExecute(
+                    "INSERT INTO access_ids (study_id, access_code) VALUES (?, ?)",
+                    [$studyDbId, $accessCode]
+                );
+            } catch (Exception $e) {
+                // Ignorer les erreurs de duplication
+            }
+        }
+    }
+}
+
+function parseStudyConfig($filePath) {
+    $content = file_get_contents($filePath);
+    $config = [];
+    
+    if (preg_match("/studyId:\s*['\"]([^'\"]+)['\"]/", $content, $matches)) {
+        $config['studyId'] = $matches[1];
+    } else {
+        return null;
+    }
+    
+    // Regex amélioré pour gérer les apostrophes/guillemets échappés
+    // Match avec apostrophe simple (gère \')
+    if (preg_match("/studyTitle:\s*'((?:[^'\\\\]|\\\\.)*)'/", $content, $matches)) {
+        $config['studyTitle'] = stripslashes($matches[1]);
+    }
+    // Match avec guillemets doubles (gère \")
+    elseif (preg_match('/studyTitle:\s*"((?:[^"\\\\]|\\\\.)*)"/', $content, $matches)) {
+        $config['studyTitle'] = stripslashes($matches[1]);
+    }
+    
+    // Même correction pour studyDate
+    if (preg_match("/studyDate:\s*'((?:[^'\\\\]|\\\\.)*)'/", $content, $matches)) {
+        $config['studyDate'] = stripslashes($matches[1]);
+    } elseif (preg_match('/studyDate:\s*"((?:[^"\\\\]|\\\\.)*)"/', $content, $matches)) {
+        $config['studyDate'] = stripslashes($matches[1]);
+    }
+    
+    if (preg_match("/totalParticipants:\s*(\d+)/", $content, $matches)) {
+        $config['totalParticipants'] = intval($matches[1]);
+    }
+    
+    $config['quotas'] = parseQuotasFromContent($content);
+    
+    return $config;
+}
+
+function getResponseAnswers($responseInternalId) {
+    $answers = dbQuery(
+        "SELECT question_id, answer_value, answer_values, answer_text, answer_data FROM answers WHERE response_id = ?",
+        [$responseInternalId]
+    );
+    
+    $result = [];
+    foreach ($answers as $answer) {
+        $data = [];
+        
+        if ($answer['answer_value'] !== null) {
+            $data['value'] = $answer['answer_value'];
+        }
+        if ($answer['answer_values'] !== null) {
+            $decoded = json_decode($answer['answer_values'], true);
+            if ($decoded !== null) {
+                $data['values'] = $decoded;
+            }
+        }
+        if ($answer['answer_text'] !== null) {
+            $data['text'] = $answer['answer_text'];
+        }
+        if ($answer['answer_data'] !== null) {
+            $extraData = json_decode($answer['answer_data'], true);
+            if ($extraData) {
+                $data = array_merge($data, $extraData);
+            }
+        }
+        
+        if (!empty($data)) {
+            $result[$answer['question_id']] = $data;
+        }
+    }
+    
+    return $result;
+}
+
+function getSignaletique($responseInternalId) {
+    $sig = dbQueryOne(
+        "SELECT nom, prenom, email, telephone, adresse, code_postal, ville FROM signaletiques WHERE response_id = ?",
+        [$responseInternalId]
+    );
+    
+    if (!$sig) return [];
+    
     return [
-        'responses' => $dataDir . '/responses.enc',
-        'refused' => $dataDir . '/refused.enc'
+        'nom' => $sig['nom'],
+        'prenom' => $sig['prenom'],
+        'email' => $sig['email'],
+        'telephone' => $sig['telephone'],
+        'adresse' => $sig['adresse'],
+        'codePostal' => $sig['code_postal'],
+        'ville' => $sig['ville']
     ];
 }
 
+/**
+ * Calcule les métriques de qualité pour les études data_collection
+ */
+function calculateDataQualityMetrics($reponses, $behaviorMetrics, $studyId = '') {
+    $metrics = [
+        'attentionChecksPassed' => 0,
+        'attentionChecksTotal' => 0,
+        'trustScore' => $behaviorMetrics['trustScore'] ?? null,
+        'pasteEvents' => $behaviorMetrics['pasteEvents'] ?? 0,
+        'sessionDuration' => $behaviorMetrics['sessionDuration'] ?? null,
+        'tabSwitches' => $behaviorMetrics['tabSwitches'] ?? 0,
+        'totalTextResponses' => 0,
+        'avgWordCount' => 0,
+        'categoriesCompleted' => [],
+        'overallQualityScore' => 100
+    ];
+    
+    // Mapping des réponses correctes par étude
+    $attentionAnswersByStudy = [
+        'DATA_IA_JAN2026' => [
+            'p1_attention_check_1' => 'blue',
+            'p4_attention_check_2' => 'disagree'
+        ],
+        'CULTURE_FR_2026' => [
+            'p1_attention_check' => 'rdv',
+            'p4_attention_check' => 'trois'
+        ],
+        'PREF_STYLE_FR_2026' => [
+            'p1_attention_check' => 'orange',
+            'p3_attention_check' => 'stress'
+        ],
+        'EVAL_IA_EXPRESS_2026' => [
+            'attention_1' => 'A',
+            'attention_2' => 'vérifié'
+        ]
+    ];
+    
+    // Récupérer le mapping pour cette étude
+    $attentionAnswers = $attentionAnswersByStudy[$studyId] ?? [];
+    
+    $wordCounts = [];
+    $categories = [];
+    
+    // Analyser les réponses
+    foreach ($reponses as $questionId => $answer) {
+        // Détecter les attention checks (toute question contenant "attention")
+        if (strpos($questionId, 'attention') !== false) {
+            $metrics['attentionChecksTotal']++;
+            
+            $answerValue = $answer['value'] ?? '';
+            
+            // Vérifier si la réponse est correcte selon le mapping de l'étude
+            if (isset($attentionAnswers[$questionId])) {
+                $expected = $attentionAnswers[$questionId];
+                $actual = is_string($answerValue) ? mb_strtolower(trim($answerValue)) : $answerValue;
+                $expectedLower = is_string($expected) ? mb_strtolower(trim($expected)) : $expected;
+                
+                // Comparaison flexible pour les textes
+                if ($actual === $expectedLower || 
+                    (is_string($actual) && strpos($actual, $expectedLower) !== false)) {
+                    $metrics['attentionChecksPassed']++;
+                }
+            }
+        }
+        
+        // Compter les réponses texte
+        if (isset($answer['value']) && is_string($answer['value']) && strlen($answer['value']) > 50) {
+            $metrics['totalTextResponses']++;
+            $wordCount = str_word_count($answer['value']);
+            $wordCounts[] = $wordCount;
+        }
+        
+        // Identifier les catégories complétées
+        if (preg_match('/^p(\d+)_([a-z]+)_/', $questionId, $m)) {
+            $cat = $m[2];
+            if (!in_array($cat, $categories)) {
+                $categories[] = $cat;
+            }
+        }
+    }
+    
+    // Calculer la moyenne de mots
+    if (count($wordCounts) > 0) {
+        $metrics['avgWordCount'] = round(array_sum($wordCounts) / count($wordCounts));
+    }
+    
+    $metrics['categoriesCompleted'] = $categories;
+    
+    // Calculer le score de qualité global
+    $qualityScore = 100;
+    
+    // Pénalités attention checks
+    if ($metrics['attentionChecksTotal'] > 0) {
+        $ratio = $metrics['attentionChecksPassed'] / $metrics['attentionChecksTotal'];
+        if ($ratio < 1) {
+            $qualityScore -= (1 - $ratio) * 30;
+        }
+    }
+    
+    // Pénalités comportementales
+    if ($metrics['trustScore'] !== null && $metrics['trustScore'] < 70) {
+        $qualityScore -= (70 - $metrics['trustScore']) / 2;
+    }
+    if ($metrics['pasteEvents'] > 5) {
+        $qualityScore -= 10;
+    }
+    if ($metrics['sessionDuration'] !== null && $metrics['sessionDuration'] < 300) {
+        $qualityScore -= 15;
+    }
+    
+    $metrics['overallQualityScore'] = max(0, min(100, round($qualityScore)));
+    
+    return $metrics;
+}
+
+// ============================================================
+// REQUÊTE GET : Récupérer toutes les données
+// ============================================================
+
+$userRole = $_SESSION['user_role'] ?? 'user';
+$allowedStudies = $_SESSION['allowed_studies'] ?? [];
+
 $studies = detectStudies();
+
+// Filtrer selon les permissions
+if ($userRole === 'user' && !in_array('*', $allowedStudies)) {
+    $studies = array_filter($studies, function($study) use ($allowedStudies) {
+        return in_array($study['folder'], $allowedStudies) || in_array($study['studyId'], $allowedStudies);
+    });
+    $studies = array_values($studies);
+}
 
 $studiesData = [];
 
 foreach ($studies as $study) {
-    $studyId = $study['studyId'];
+    $studyDbId = $study['dbId'];
     $studyFolder = $study['folder'];
+    $studyType = $study['studyType'] ?? 'classic';
     
-    $dataFiles = getStudyDataFiles($studyFolder);
-    $studyResponses = loadResponses($dataFiles['responses']);
-    $studyRefused = loadResponses($dataFiles['refused']);
-    
-    $stats = [
-        'total' => count($studyResponses) + count($studyRefused),
-        'qualifies' => 0,
-        'refuses' => count($studyRefused),
-        'en_cours' => 0
-    ];
+    // Récupérer les participants depuis MySQL
+    // Essayer d'abord avec behavior_metrics, sinon sans
+    try {
+        $allResponses = dbQuery(
+            "SELECT r.id as internal_id, r.unique_id, r.access_id, r.status, r.stop_reason, 
+                    r.all_stop_reasons, r.horaire, r.started_at, r.completed_at, r.behavior_metrics
+             FROM responses r WHERE r.study_id = ? ORDER BY r.started_at DESC",
+            [$studyDbId]
+        );
+    } catch (Exception $e) {
+        // Fallback sans behavior_metrics si la colonne n'existe pas
+        $allResponses = dbQuery(
+            "SELECT r.id as internal_id, r.unique_id, r.access_id, r.status, r.stop_reason, 
+                    r.all_stop_reasons, r.horaire, r.started_at, r.completed_at, NULL as behavior_metrics
+             FROM responses r WHERE r.study_id = ? ORDER BY r.started_at DESC",
+            [$studyDbId]
+        );
+    }
     
     $qualifies = [];
+    $refuses = [];
     $enCours = [];
     
-    foreach ($studyResponses as $response) {
-        switch ($response['statut']) {
-            case 'QUALIFIE':
-                $stats['qualifies']++;
-                $qualifies[] = $response;
-                break;
-            default:
-                $stats['en_cours']++;
-                $enCours[] = $response;
+    foreach ($allResponses as $r) {
+        $internalId = $r['internal_id'];
+        $sig = getSignaletique($internalId);
+        $reponses = getResponseAnswers($internalId);
+        
+        // Parser les métriques comportementales
+        $behaviorMetrics = null;
+        if (!empty($r['behavior_metrics'])) {
+            $behaviorMetrics = json_decode($r['behavior_metrics'], true);
+        }
+        
+        // Calculer les métriques de qualité pour études data_collection
+        $qualityData = null;
+        if ($studyType === 'data_collection') {
+            $qualityData = calculateDataQualityMetrics($reponses, $behaviorMetrics, $studyFolder);
+        }
+        
+        $participant = [
+            'id' => $r['unique_id'],
+            'accessId' => $r['access_id'] ?? '',
+            'nom' => $sig['nom'] ?? 'N/A',
+            'prenom' => $sig['prenom'] ?? 'N/A',
+            'email' => $sig['email'] ?? 'N/A',
+            'telephone' => $sig['telephone'] ?? 'N/A',
+            'ville' => $sig['ville'] ?? 'N/A',
+            'adresse' => $sig['adresse'] ?? 'N/A',
+            'codePostal' => $sig['codePostal'] ?? 'N/A',
+            'horaire' => $r['horaire'] ?? 'N/A',
+            'dateDebut' => $r['started_at'] ?? 'N/A',
+            'dateFin' => $r['completed_at'] ?? $r['started_at'] ?? 'N/A',
+            'date' => $r['completed_at'] ?? $r['started_at'] ?? 'N/A',
+            'reponses' => $reponses,
+            'behaviorMetrics' => $behaviorMetrics,
+            'qualityData' => $qualityData
+        ];
+        
+        if ($r['status'] === 'QUALIFIE') {
+            $participant['statut'] = 'QUALIFIÉ';
+            $qualifies[] = $participant;
+        } elseif ($r['status'] === 'REFUSE') {
+            $raisons = [];
+            if (!empty($r['all_stop_reasons'])) {
+                $allReasons = json_decode($r['all_stop_reasons'], true);
+                if ($allReasons) {
+                    foreach ($allReasons as $stop) {
+                        $raisons[] = $stop['raison'] ?? '';
+                    }
+                }
+            } elseif (!empty($r['stop_reason'])) {
+                $raisons[] = $r['stop_reason'];
+            }
+            
+            $participant['statut'] = 'REFUSÉ';
+            $participant['raisons'] = $raisons;
+            $participant['raisonPrincipale'] = $r['stop_reason'] ?? 'Non spécifiée';
+            $refuses[] = $participant;
+        } else {
+            $participant['statut'] = 'EN_COURS';
+            $participant['questionsRepondues'] = count($reponses);
+            $participant['derniereActivite'] = $r['completed_at'] ?? $r['started_at'] ?? 'N/A';
+            $enCours[] = $participant;
         }
     }
     
+    $stats = [
+        'total' => count($allResponses),
+        'qualifies' => count($qualifies),
+        'refuses' => count($refuses),
+        'en_cours' => count($enCours)
+    ];
+    
     $quotas = calculateQuotas($qualifies, $study['quotas'] ?? []);
     
-    $participantsQualifies = array_map(function($q) {
-        return [
-            'id' => $q['id'] ?? '',
-            'accessId' => $q['accessId'] ?? '',
-            'nom' => $q['signaletique']['nom'] ?? 'N/A',
-            'prenom' => $q['signaletique']['prenom'] ?? 'N/A',
-            'email' => $q['signaletique']['email'] ?? 'N/A',
-            'telephone' => $q['signaletique']['telephone'] ?? 'N/A',
-            'ville' => $q['signaletique']['ville'] ?? 'N/A',
-            'adresse' => $q['signaletique']['adresse'] ?? 'N/A',
-            'codePostal' => $q['signaletique']['codePostal'] ?? 'N/A',
-            'horaire' => $q['horaire'] ?? 'N/A',
-            'date' => $q['dateFin'] ?? $q['dateDebut'] ?? 'N/A',
-            'statut' => 'QUALIFIÉ',
-            'reponses' => $q['reponses'] ?? []
-        ];
-    }, $qualifies);
-    
-    $participantsRefuses = array_map(function($q) {
-        $raisons = [];
-        if (!empty($q['toutesRaisonsStop'])) {
-            foreach ($q['toutesRaisonsStop'] as $stop) {
-                $raisons[] = $stop['raison'] ?? '';
-            }
-        } elseif (!empty($q['raisonStop'])) {
-            $raisons[] = $q['raisonStop'];
-        }
-        
-        return [
-            'id' => $q['id'] ?? '',
-            'accessId' => $q['accessId'] ?? '',
-            'nom' => $q['signaletique']['nom'] ?? 'N/A',
-            'prenom' => $q['signaletique']['prenom'] ?? 'N/A',
-            'email' => $q['signaletique']['email'] ?? 'N/A',
-            'telephone' => $q['signaletique']['telephone'] ?? 'N/A',
-            'raisons' => $raisons,
-            'raisonPrincipale' => $q['raisonStop'] ?? 'Non spécifiée',
-            'date' => $q['dateFin'] ?? $q['dateDebut'] ?? 'N/A',
-            'statut' => 'REFUSÉ',
-            'reponses' => $q['reponses'] ?? []
-        ];
-    }, array_values($studyRefused));
-    
-    $participantsEnCours = array_map(function($q) {
-        $questionsRepondues = count($q['reponses'] ?? []);
-        return [
-            'id' => $q['id'] ?? '',
-            'accessId' => $q['accessId'] ?? '',
-            'nom' => $q['signaletique']['nom'] ?? 'N/A',
-            'prenom' => $q['signaletique']['prenom'] ?? 'N/A',
-            'email' => $q['signaletique']['email'] ?? 'N/A',
-            'telephone' => $q['signaletique']['telephone'] ?? 'N/A',
-            'ville' => $q['signaletique']['ville'] ?? 'N/A',
-            'adresse' => $q['signaletique']['adresse'] ?? 'N/A',
-            'codePostal' => $q['signaletique']['codePostal'] ?? 'N/A',
-            'dateDebut' => $q['dateDebut'] ?? 'N/A',
-            'derniereActivite' => $q['dateFin'] ?? $q['dateDebut'] ?? 'N/A',
-            'questionsRepondues' => $questionsRepondues,
-            'statut' => 'EN_COURS',
-            'reponses' => $q['reponses'] ?? []
-        ];
-    }, $enCours);
-    
     $studiesData[] = [
-        'studyId' => $studyId,
-        'studyName' => $study['studyTitle'] ?? 'Étude',
+        'studyId' => $study['studyId'],
+        'studyName' => $study['studyTitle'] ?? $study['studyId'],
         'studyDate' => $study['studyDate'] ?? '',
-        'folder' => $study['folder'] ?? '',
-        'status' => $study['status'] ?? 'active',
-        'closedAt' => $study['closedAt'] ?? null,
+        'studyType' => $studyType,
+        'folder' => $study['folder'],
+        'status' => $study['status'],
+        'closedAt' => $study['closedAt'],
         'targetParticipants' => $study['totalParticipants'] ?? 5,
         'stats' => $stats,
         'quotas' => $quotas,
-        'qualifies' => $participantsQualifies,
-        'refuses' => $participantsRefuses,
-        'enCours' => $participantsEnCours
+        'qualifies' => $qualifies,
+        'refuses' => $refuses,
+        'enCours' => $enCours
     ];
 }
 

@@ -3,7 +3,7 @@ const STUDY_CONFIG = {
     
     studyId: 'FM_EXPLO_TP_JAN2025',
     studyTitle: 'Etude Fleury Michon',
-    studyDate: 'Janvier 2025',
+    studyDate: 'Janvier 2026',
     reward: '50 euros',
     duration: '2h30',
     horaires: ['Jeudi 15/01 - 14h', 'Mardi 20/01 - 14h'],

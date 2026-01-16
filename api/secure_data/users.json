@@ -1,0 +1,24 @@
+[
+    {
+        "id": "user_6964cdf237c14",
+        "username": "adem.nasri",
+        "password_hash": "$argon2id$v=19$m=65536,t=4,p=1$OExpT0dJLkpqNjdnbHJTMA$DLbLIIDmp6t9OZ8x4xDYj6U75ptRRYiccgYfGSbbSyc",
+        "display_name": "adem nasri",
+        "role": "super_admin",
+        "allowed_studies": [],
+        "created_at": "2026-01-12 10:33:22",
+        "last_login": "2026-01-13 09:17:39"
+    },
+    {
+        "id": "user_6964ce34e475e",
+        "username": "test",
+        "password_hash": "$argon2id$v=19$m=65536,t=4,p=1$WmU2TVVZRURWZzMubS5HTg$SJC5tNXeDt57RSrLXDxlHTuOEQ1w0pLMKQOozF94B5o",
+        "display_name": "test",
+        "role": "user",
+        "allowed_studies": [
+            "SECHE_CHEVEUX_MDT_JAN2026"
+        ],
+        "created_at": "2026-01-12 10:34:29",
+        "last_login": "2026-01-12 12:10:06"
+    }
+]

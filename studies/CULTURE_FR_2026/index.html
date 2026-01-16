@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Questionnaire - Culture française</title>
+    <link rel="stylesheet" href="../../css/style.css?v=81">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Styles pour les questions culturelles */
+        .comparison-scenario {
+            background: #fef3c7;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #f59e0b;
+        }
+        .comparison-scenario blockquote {
+            background: #fef9c3;
+            padding: 12px 16px;
+            border-left: 4px solid #eab308;
+            margin: 12px 0 0 0;
+            border-radius: 0 8px 8px 0;
+            font-style: italic;
+        }
+        
+        /* Style pour les questions d'étranger */
+        textarea {
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Chargement du questionnaire...</p>
+        </div>
+    </div>
+    
+    <script src="../../js/engine.js?v=81"></script>
+    <script src="questions.js?v=81"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('status.json?v=' + Date.now());
+                const status = await response.json();
+                
+                if (status.status === 'closed') {
+                    window.location.href = '../closed.html';
+                    return;
+                }
+                
+                const questionnaire = new QuestionnaireEngine(STUDY_CONFIG);
+                questionnaire.init();
+            } catch (error) {
+                const questionnaire = new QuestionnaireEngine(STUDY_CONFIG);
+                questionnaire.init();
+            }
+        });
+    </script>
+</body>
+</html>

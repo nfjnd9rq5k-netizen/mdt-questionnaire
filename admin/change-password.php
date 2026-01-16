@@ -7,6 +7,14 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
+$adminRole = $_SESSION['user_role'] ?? 'user';
+
+// Seul Super Admin peut accéder aux paramètres
+if ($adminRole !== 'super_admin') {
+    header('Location: dashboard.php');
+    exit;
+}
+
 $success = '';
 $error = '';
 
@@ -25,7 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "❌ Le nouveau mot de passe doit faire au moins 8 caractères.";
     }
     else {
-        $newHash = password_hash($newPassword, PASSWORD_ARGON2ID);
+        // Hash intelligent - ARGON2ID si disponible, sinon bcrypt
+        $newHash = null;
+        if (defined('PASSWORD_ARGON2ID')) {
+            $newHash = @password_hash($newPassword, PASSWORD_ARGON2ID);
+        }
+        if (!$newHash) {
+            $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+        }
         
         $configFile = __DIR__ . '/../api/config.php';
         $configContent = file_get_contents($configFile);

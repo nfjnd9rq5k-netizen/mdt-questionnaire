@@ -1,7 +1,4 @@
 <?php
-define('ADMIN_USERNAME', 'admin');
-
-define('ADMIN_PASSWORD_HASH', '$argon2id$v=19$m=65536,t=4,p=1$WC9MbnJhaU5zUmFoRUphLg$+1LGwuCS+8AMCQ57GJs3h5wXjSZKyYYvjePbJ6WEiAg');
 
 define('ENCRYPTION_KEY_FILE', __DIR__ . '/secure_data/.encryption_key');
 
